@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Activity, Eye, Compass, ShieldAlert } from "lucide-react";
+import { Activity, Eye, Compass, ShieldAlert, HeartPulse } from "lucide-react";
 import { FaceTelemetry } from "@/utils/telemetry";
 
 interface TelemetryHUDProps {
@@ -20,7 +20,7 @@ export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
 
   return (
     <div className="win98-bevel-in bg-black/90 p-2 text-xs font-mono text-emerald-400 border border-neutral-700 shadow-inner flex flex-wrap items-center justify-between gap-3 select-none">
-      {/* MediaPipe Status */}
+      {/* MediaPipe & Presage Biometric Status */}
       <div className="flex items-center gap-2">
         <Activity
           className={`w-3.5 h-3.5 ${
@@ -28,10 +28,27 @@ export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
           }`}
         />
         <span className="text-[11px] text-neutral-300">
-          AFFECT_CORE:{" "}
+          BIOMETRIC_AFFECT:{" "}
           <strong className={isModelReady ? "text-emerald-400" : "text-amber-400"}>
-            {isModelReady ? "ONLINE (30 FPS)" : "CALIBRATING..."}
+            {isModelReady ? "LIVE (30 FPS)" : "CALIBRATING..."}
           </strong>
+        </span>
+      </div>
+
+      {/* Physiological Pulse/Stress Indicator */}
+      <div className="flex items-center gap-1.5 text-[11px]">
+        <HeartPulse
+          className={`w-3.5 h-3.5 ${
+            telemetry.heartRateStress > 85 ? "text-red-500 animate-ping" : "text-emerald-400"
+          }`}
+        />
+        <span className="text-neutral-400">PULSE_LOAD:</span>
+        <span
+          className={`font-bold ${
+            telemetry.heartRateStress > 85 ? "text-red-400 font-extrabold" : "text-neutral-100"
+          }`}
+        >
+          {telemetry.heartRateStress} BPM
         </span>
       </div>
 
@@ -52,7 +69,7 @@ export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
       {/* Eye Gaze Target */}
       <div className="flex items-center gap-1.5 text-[11px]">
         <Eye className="w-3.5 h-3.5 text-amber-400" />
-        <span className="text-neutral-400">GAZE_TRACK:</span>
+        <span className="text-neutral-400">GAZE:</span>
         <span
           className={`font-bold ${
             isLookingAtViewfinder
@@ -63,25 +80,25 @@ export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
           }`}
         >
           {isLookingAtViewfinder
-            ? "⚠ VIEWING CAM (DANGER!)"
+            ? "⚠ AT VIEWFINDER"
             : telemetry.gazeLocked
             ? "READING CHAT"
             : "LOOKING AROUND"}
         </span>
       </div>
 
-      {/* Entity Stage */}
+      {/* Room Anomaly */}
       <div className="flex items-center gap-1.5 text-[11px]">
         <ShieldAlert className="w-3.5 h-3.5 text-red-500" />
-        <span className="text-neutral-400">ROOM_ANOMALY:</span>
+        <span className="text-neutral-400">ANOMALY:</span>
         <span className="text-red-400 font-bold">
           {clownStage === "none"
-            ? "CLEAR (0/3)"
+            ? "CLEAR"
             : clownStage === "standing_far"
-            ? "FAR CORNER (1/3)"
+            ? `FAR CORNER (${telemetry.faceBox.openRoomSide.toUpperCase()})`
             : clownStage === "near_unsmiling"
-            ? "BEHIND CHAIR (2/3)"
-            : "JUMPSCARE (3/3)"}
+            ? "BEHIND CHAIR"
+            : "JUMPSCARE"}
         </span>
       </div>
     </div>

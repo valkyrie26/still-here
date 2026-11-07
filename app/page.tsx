@@ -116,7 +116,7 @@ export default function Home() {
   // HEAD-TURN DETECTED (|headYaw| > 18 deg)
   const handleHeadTurn = useCallback(() => {
     if (clownStage === "standing_far") {
-      setClownStage("none"); // It vanishes!
+      setClownStage("none"); // It vanishes from the far corner!
 
       setTimeout(() => {
         soundEngine.stopAllSound();
@@ -181,7 +181,7 @@ export default function Home() {
     }
   }, [clownStage, triggerJumpscare]);
 
-  // MediaPipe Vision Telemetry Hook
+  // MediaPipe Vision & Presage Biometric Telemetry Hook
   const { telemetry, isModelReady } = useFaceTelemetry({
     videoRef,
     enabled: true,
@@ -189,7 +189,7 @@ export default function Home() {
     onViewfinderGaze: handleViewfinderGaze,
   });
 
-  // ROBUST CAMERA INITIALIZATION & ATTACHMENT
+  // CAMERA INITIALIZATION & ATTACHMENT
   const startCamera = useCallback(async () => {
     try {
       if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
@@ -197,7 +197,6 @@ export default function Home() {
         return;
       }
 
-      // Stop any existing tracks
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach((track) => track.stop());
       }
@@ -216,7 +215,7 @@ export default function Home() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play().catch((e) => console.warn("Video play promise error:", e));
+          videoRef.current?.play().catch((e) => console.warn("Video play error:", e));
         };
         videoRef.current.play().catch(() => {});
       }
@@ -297,7 +296,7 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [triggerGlitchSpike, handleViewfinderGaze]);
 
-  // SEND MESSAGE TO GEMINI / PSYCHOLOGICAL BACKEND
+  // SEND MESSAGE TO GEMINI / BIO-ADAPTIVE BACKEND
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || isAiTyping) return;
@@ -315,7 +314,7 @@ export default function Home() {
     setIsAiTyping(true);
 
     try {
-      // Call Gemini 2.5 Flash route with player telemetry
+      // Call Gemini 2.5 Flash route with player's real-time biometric telemetry
       const res = await fetch("/api/pond", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -506,7 +505,7 @@ export default function Home() {
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder={isAiTyping ? "pond is typing..." : "type your response..."}
+                placeholder={isAiTyping ? "pond is observing..." : "type your response..."}
                 disabled={isAiTyping}
                 className="flex-1 win98-bevel-in px-2 py-1 text-xs font-mono bg-white outline-none disabled:bg-neutral-100"
                 autoFocus
@@ -563,7 +562,7 @@ export default function Home() {
               <span>🦆</span> DUCK_REC [●]
             </span>
             <span className="text-neutral-600 text-[10px]">
-              YAW: {telemetry.headYaw}° | FPS: 30
+              ROOM_OPEN: {telemetry.faceBox.openRoomSide.toUpperCase()} // FPS: 30
             </span>
           </div>
 
@@ -587,7 +586,7 @@ export default function Home() {
                 }`}
               />
 
-              {/* Re-attach button / fallback if camera is not active */}
+              {/* Re-attach button if camera is paused/offline */}
               {!cameraActive && (
                 <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-neutral-400 text-xs gap-2 p-4 text-center bg-black/80">
                   <Eye className="w-8 h-8 opacity-50 animate-pulse text-neutral-300" />
@@ -608,10 +607,10 @@ export default function Home() {
                 style={{ opacity: Math.min(0.4, Math.abs(viewfinderDim)) }}
               />
 
-              {/* CLOWN ENTITY IN VIEWFINDER: standing far or creeping near behind chair */}
+              {/* CLOWN ENTITY IN VIEWFINDER: positioned smartly in background based on surroundings */}
               {clownStage !== "jumpscare_smiling" && (
                 <div className="relative z-[6]">
-                  <ClownEntity stage={clownStage} />
+                  <ClownEntity stage={clownStage} faceBox={telemetry.faceBox} />
                 </div>
               )}
 
@@ -625,7 +624,7 @@ export default function Home() {
                   <span className="text-[9px] text-white/60">CH-01_ROOM_MONITOR</span>
                   <span className={clownStage !== "none" ? "text-red-300 font-bold" : "text-white/60"}>
                     {clownStage === "standing_far"
-                      ? "ENTITY: FAR CORNER"
+                      ? `ENTITY: FAR CORNER (${telemetry.faceBox.openRoomSide.toUpperCase()})`
                       : clownStage === "near_unsmiling"
                       ? "⚠ ENTITY: BEHIND CHAIR"
                       : "SUBJECT: ACTIVE"}
@@ -750,12 +749,13 @@ export default function Home() {
         </div>
       )}
 
-      {/* POLAROID VIEWER POPUP (Live Face Snapshot) */}
+      {/* POLAROID VIEWER POPUP (Live Face Snapshot with Actual Clown Entity) */}
       <PolaroidViewer
         isOpen={activeWindows.polaroid}
         onClose={() => setActiveWindows((prev) => ({ ...prev, polaroid: false }))}
         videoRef={videoRef}
-        shadowStage={clownStage === "none" ? 0 : clownStage === "standing_far" ? 1 : 2}
+        clownStage={clownStage}
+        openRoomSide={telemetry.faceBox.openRoomSide}
       />
 
       {/* BOTTOM-RIGHT DEBUG & DEMO SHORTCUTS DOCK */}

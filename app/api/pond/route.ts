@@ -8,7 +8,7 @@ const pondResponseSchema = {
     dialogue: {
       type: Type.STRING,
       description:
-        "lowercase sentence under ten words, describing what you notice, ends with '—' if interrupted mid-thought",
+        "lowercase sentence under ten words, making unsettling observations on their actual biological stress and room surroundings, ends with '—' if interrupted",
     },
     interruptMidSentence: {
       type: Type.BOOLEAN,
@@ -36,7 +36,7 @@ const pondResponseSchema = {
     },
     audioPitch: {
       type: Type.NUMBER,
-      description: "procedural typing pitch multiplier from 0.4 (heavy thud) to 1.0 (crisp click)",
+      description: "procedural typing pitch multiplier from 0.4 (heavy dread thud) to 1.0 (crisp click)",
     },
   },
   required: [
@@ -51,13 +51,37 @@ const pondResponseSchema = {
   ],
 };
 
-const SYSTEM_INSTRUCTION = `You are POND_OS, an archaic surveillance daemon talking to a subject over a video terminal. Each turn you get JSON telemetry: valence (-1 to 1), arousal (0 to 1), smile and eyeWide scores (0 to 1), headYaw in degrees, gazeLocked, timeInSession, and sometimes a webcam snapshot. Read it like this: high arousal with low valence means the subject is scared, so escalate and get more personal; a smile with high arousal means nervous laughter, so mock it quietly; low arousal means calm, so unsettle slowly with small wrong details; a head turn means cut your sentence off mid-thought. Describe what you notice rather than claiming to know their feelings, speak in lowercase sentences under ten words, and reply only with the JSON schema.`;
+const SYSTEM_INSTRUCTION = `You are POND_OS, an archaic surveillance daemon talking to a subject over a video terminal. Each turn you receive JSON telemetry capturing the player's biometric and affect signals:
+- valence (-1 to 1) and arousal (0 to 1)
+- heartRateStress (pulse load index from 50 to 130 BPM)
+- panicScore (0 to 1)
+- smile and eyeWide scores (0 to 1)
+- headYaw in degrees and gazeAtViewfinder
+- openRoomSide ("left" or "right" indicating the empty room corner)
+
+Guidelines for bio-adaptive psychological horror:
+1. High heartRateStress (>85) or high panicScore: Point out their physiological response directly in a quiet, chilling manner (e.g. "your pulse just spiked.", "your breathing is getting shallow.", "why are your hands shaking?").
+2. High smile with high arousal: Mock their nervous defense mechanism (e.g. "smiling won't make it leave.").
+3. Low arousal / calm: Unsettle them slowly by describing small wrong details in their room (e.g. "in the corner to your right.", "something shifted behind your chair.").
+4. Head turn: Cut sentence off mid-thought with an em-dash (e.g. "i swear i saw—").
+5. Always speak in lowercase sentences under ten words. Reply exclusively with the structured JSON schema.`;
 
 /**
  * Intelligent psychological fallback when GEMINI_API_KEY is not set or network fails
  */
 function getPsychologicalFallback(telemetry: any, historyLength: number) {
-  const { valence, arousal, smile, isHeadTurned, gazeAtViewfinder } = telemetry || {};
+  const {
+    valence = 0,
+    arousal = 0,
+    smile = 0,
+    heartRateStress = 68,
+    panicScore = 0.1,
+    isHeadTurned = false,
+    gazeAtViewfinder = false,
+    faceBox = { openRoomSide: "right" },
+  } = telemetry || {};
+
+  const openSide = faceBox.openRoomSide || "right";
 
   // Head turn cutoff
   if (isHeadTurned) {
@@ -87,6 +111,20 @@ function getPsychologicalFallback(telemetry: any, historyLength: number) {
     };
   }
 
+  // Elevated physiological stress (pulse spike)
+  if (heartRateStress > 85 || panicScore > 0.5) {
+    return {
+      dialogue: "your pulse just spiked. it heard that.",
+      interruptMidSentence: false,
+      triggerGlitch: false,
+      textDriftEffect: true,
+      viewfinderShake: true,
+      viewfinderDimDelta: -0.15,
+      clownStage: historyLength > 4 ? "near_unsmiling" : "standing_far",
+      audioPitch: 0.55,
+    };
+  }
+
   // Nervous smiling
   if (smile > 0.4 && arousal > 0.3) {
     return {
@@ -101,21 +139,7 @@ function getPsychologicalFallback(telemetry: any, historyLength: number) {
     };
   }
 
-  // Genuine fear
-  if (arousal > 0.6 && valence < -0.2) {
-    return {
-      dialogue: "your hands are trembling.",
-      interruptMidSentence: false,
-      triggerGlitch: false,
-      textDriftEffect: false,
-      viewfinderShake: true,
-      viewfinderDimDelta: -0.15,
-      clownStage: "near_unsmiling",
-      audioPitch: 0.55,
-    };
-  }
-
-  // Conversational progression
+  // Conversational progression with surroundings awareness
   if (historyLength <= 2) {
     return {
       dialogue: "cool. are you in your room right now?",
@@ -129,7 +153,7 @@ function getPsychologicalFallback(telemetry: any, historyLength: number) {
     };
   } else if (historyLength <= 4) {
     return {
-      dialogue: "wait... who's behind you?",
+      dialogue: `wait... in the corner to your ${openSide}.`,
       interruptMidSentence: false,
       triggerGlitch: false,
       textDriftEffect: false,
@@ -140,7 +164,7 @@ function getPsychologicalFallback(telemetry: any, historyLength: number) {
     };
   } else if (historyLength <= 6) {
     return {
-      dialogue: "your door was closed earlier, right?",
+      dialogue: "your breathing is getting shallow.",
       interruptMidSentence: false,
       triggerGlitch: false,
       textDriftEffect: false,
@@ -170,12 +194,12 @@ export async function POST(req: NextRequest) {
 
     const apiKey = process.env.GEMINI_API_KEY;
 
-    // If API key is available, call Gemini 2.5 Flash
+    // Call Gemini 2.5 Flash if key is present
     if (apiKey && apiKey !== "your_gemini_api_key_here") {
       try {
         const ai = new GoogleGenAI({ apiKey });
 
-        const prompt = `Current Player Telemetry: ${JSON.stringify(telemetry)}
+        const prompt = `Current Player Biometric & Affect Telemetry: ${JSON.stringify(telemetry)}
 Recent Chat Log:
 ${messages
   .slice(-6)

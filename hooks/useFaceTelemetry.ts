@@ -25,6 +25,14 @@ export function useFaceTelemetry({
     gazeLocked: true,
     gazeAtViewfinder: false,
     isHeadTurned: false,
+    heartRateStress: 68,
+    panicScore: 0.1,
+    faceBox: {
+      centerX: 0.5,
+      centerY: 0.5,
+      faceWidth: 0.3,
+      openRoomSide: "right",
+    },
     timeInSession: 0,
   });
 
@@ -143,7 +151,7 @@ export function useFaceTelemetry({
                 }
               }
 
-              // Trigger 2: Direct Gaze at Viewfinder / Clown
+              // Trigger 2: Direct Gaze at Viewfinder
               if (currentTelemetry.gazeAtViewfinder) {
                 if (now - lastViewfinderGazeTriggerTime.current > 2500) {
                   lastViewfinderGazeTriggerTime.current = now;
