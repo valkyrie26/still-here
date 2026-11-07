@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Video,
   MessageSquare,
@@ -11,11 +11,15 @@ import {
   Eye,
   Camera,
   FileText,
+  Activity,
 } from "lucide-react";
 import { WindowsTaskbar } from "@/components/WindowsTaskbar";
 import { DesktopIcons } from "@/components/DesktopIcons";
 import { PolaroidViewer } from "@/components/PolaroidViewer";
 import { ScreenCrack } from "@/components/ScreenCrack";
+import { GhostFigure } from "@/components/GhostFigure";
+import { TelemetryHUD } from "@/components/TelemetryHUD";
+import { useFaceTelemetry } from "@/hooks/useFaceTelemetry";
 
 interface ChatMessage {
   id: string;
@@ -30,6 +34,7 @@ export default function Home() {
     chat: true,
     viewfinder: true,
     polaroid: false,
+    hud: true,
   });
 
   // Dialog & Horror Popups
@@ -43,12 +48,15 @@ export default function Home() {
   const [glitchActive, setGlitchActive] = useState(false);
   const [viewfinderShake, setViewfinderShake] = useState(false);
   const [viewfinderDim, setViewfinderDim] = useState(0); // 0 to -0.6
-  const [shadowStage, setShadowStage] = useState<number>(0); // 0 to 3
+  const [shadowStage, setShadowStage] = useState<number>(1); // Default to stage 1 to see the ghostly figure!
   const [screenCracked, setScreenCracked] = useState(false);
   const [crackSeverity, setCrackSeverity] = useState<1 | 2 | 3>(1);
   const [textDriftTrigger, setTextDriftTrigger] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [webcamMode, setWebcamMode] = useState<"vintage" | "corrupted">("vintage");
+
+  // Gaze Trap State
+  const [trapArmed, setTrapArmed] = useState(false);
 
   // Chat Feed State
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -68,7 +76,50 @@ export default function Home() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
-  // Initialize Webcam (Natural early 2000s CMOS styling, toned down green)
+  // Trigger Glitch & Horror Tear
+  const triggerGlitchSpike = useCallback(() => {
+    setGlitchActive(true);
+    setTimeout(() => setGlitchActive(false), 380);
+  }, []);
+
+  // HEAD TURN EVENT: Triggered when player turns head (|headYaw| > 18°)
+  const handleHeadTurn = useCallback(
+    (yaw: number) => {
+      // 1. Violent Glitch Tear
+      triggerGlitchSpike();
+
+      // 2. Camera Jitter
+      setViewfinderShake(true);
+      setTimeout(() => setViewfinderShake(false), 1200);
+
+      // 3. Screen Glass Fracture
+      setScreenCracked(true);
+      setCrackSeverity((prev) => (prev === 3 ? 3 : ((prev + 1) as 1 | 2 | 3)));
+
+      // 4. Ghost jumps closer behind shoulder
+      setShadowStage((prev) => Math.min(3, prev + 1));
+
+      // 5. Mid-Sentence Cutoff / Interruption in chat
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `pond-cutoff-${Date.now()}`,
+          sender: "pond",
+          text: "i swear i saw—",
+        },
+      ]);
+    },
+    [triggerGlitchSpike]
+  );
+
+  // MediaPipe Vision Telemetry Hook
+  const { telemetry, isModelReady } = useFaceTelemetry({
+    videoRef,
+    enabled: true,
+    onHeadTurn: handleHeadTurn,
+  });
+
+  // Initialize Webcam (Natural early 2000s CMOS styling)
   useEffect(() => {
     async function initCamera() {
       try {
@@ -104,12 +155,6 @@ export default function Home() {
     setActiveWindows((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // Trigger Glitch & Horror Tear
-  const triggerGlitchSpike = () => {
-    setGlitchActive(true);
-    setTimeout(() => setGlitchActive(false), 380);
-  };
-
   // Keyboard Shortcuts (1 to 6)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -122,7 +167,7 @@ export default function Home() {
         triggerGlitchSpike();
         setErrorDialogOpen(true);
       } else if (e.key === "2") {
-        // Cycle Shadow behind shoulder
+        // Cycle Ghost figure behind shoulder (0 to 3)
         setShadowStage((prev) => (prev + 1) % 4);
       } else if (e.key === "3") {
         // Open live creepy face Polaroid
@@ -142,7 +187,7 @@ export default function Home() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [triggerGlitchSpike]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,27 +202,28 @@ export default function Home() {
     setMessages((prev) => [...prev, userMsg]);
     setInputText("");
 
-    // Simulated conversational escalation for testing
+    // Simulated conversational escalation and Gaze Trap Arming
     setTimeout(() => {
-      if (messages.length === 2) {
+      if (messages.length <= 3) {
         setMessages((prev) => [
           ...prev,
           {
             id: `pond-${Date.now()}`,
             sender: "pond",
-            text: "your room is very quiet today.",
+            text: "don't turn around.",
           },
         ]);
-      } else if (messages.length === 4) {
+        setTrapArmed(true);
+      } else if (messages.length <= 5) {
         setMessages((prev) => [
           ...prev,
           {
             id: `pond-${Date.now()}`,
             sender: "pond",
-            text: "who's behind you?",
+            text: "in the corner. i saw someone standing there.",
           },
         ]);
-        setShadowStage(1);
+        setShadowStage(2);
       }
     }, 1200);
   };
@@ -205,13 +251,22 @@ export default function Home() {
         anomaliesDiscovered={shadowStage}
       />
 
+      {/* TOP DOCKED: Real-Time Affect & Head-Turn Telemetry HUD */}
+      <div className="absolute top-1 left-28 right-4 md:left-36 md:right-8 z-20">
+        <TelemetryHUD
+          telemetry={telemetry}
+          isModelReady={isModelReady}
+          shadowStage={shadowStage}
+        />
+      </div>
+
       {/* WINDOW 1: POND Instant Messenger (Windows 98 Style) */}
       {activeWindows.chat && (
         <div
-          className={`absolute top-6 left-28 md:left-36 w-[340px] md:w-[480px] bg-[#c0c0c0] win98-bevel-out shadow-2xl z-30 transition-all ${
+          className={`absolute top-14 left-28 md:left-36 w-[340px] md:w-[480px] bg-[#c0c0c0] win98-bevel-out shadow-2xl z-30 transition-all ${
             shadowStage >= 2 ? "border-red-900" : ""
           }`}
-          style={{ maxHeight: "calc(100vh - 80px)" }}
+          style={{ maxHeight: "calc(100vh - 120px)" }}
         >
           {/* Title Bar */}
           <div
@@ -258,7 +313,7 @@ export default function Home() {
           </div>
 
           {/* Chat Feed Inner Box */}
-          <div className="p-2 flex flex-col h-[340px] md:h-[400px]">
+          <div className="p-2 flex flex-col h-[320px] md:h-[370px]">
             <div className="flex-1 bg-white win98-bevel-in p-2.5 overflow-y-auto space-y-2.5 text-xs font-mono scrollbar-thin">
               {messages.map((msg) => (
                 <div
@@ -290,7 +345,7 @@ export default function Home() {
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="type your response..."
+                placeholder={trapArmed ? "don't turn around..." : "type your response..."}
                 className="flex-1 win98-bevel-in px-2 py-1 text-xs font-mono bg-white outline-none"
                 autoFocus
               />
@@ -305,10 +360,10 @@ export default function Home() {
         </div>
       )}
 
-      {/* WINDOW 2: Video Call Viewfinder Window (Natural early 2000s webcam aesthetic) */}
+      {/* WINDOW 2: Video Call Viewfinder Window with Spooky Ghost Figure */}
       {activeWindows.viewfinder && (
         <div
-          className={`absolute top-6 right-4 md:right-8 w-[320px] md:w-[380px] bg-[#c0c0c0] win98-bevel-out shadow-2xl z-20 ${
+          className={`absolute top-14 right-4 md:right-8 w-[320px] md:w-[380px] bg-[#c0c0c0] win98-bevel-out shadow-2xl z-20 ${
             viewfinderShake ? "viewfinder-shake" : ""
           }`}
         >
@@ -339,13 +394,15 @@ export default function Home() {
             <span className="flex items-center gap-1 text-red-700 font-bold">
               <span>🦆</span> DUCK_REC [●]
             </span>
-            <span className="text-neutral-600 text-[10px]">FPS: 30.1 // P31_CORRECTED</span>
+            <span className="text-neutral-600 text-[10px]">
+              YAW: {telemetry.headYaw}° | FPS: 30
+            </span>
           </div>
 
           {/* Video Viewport Container */}
           <div className="p-2">
             <div className="relative aspect-[4/3] w-full bg-black win98-bevel-in overflow-hidden flex items-center justify-center">
-              {/* Natural Live Webcam Video Feed (toned down green, authentic vintage) */}
+              {/* Natural Live Webcam Video Feed */}
               <video
                 ref={videoRef}
                 autoPlay
@@ -361,43 +418,19 @@ export default function Home() {
                   <Eye className="w-8 h-8 opacity-50 animate-pulse text-neutral-300" />
                   <span className="font-mono">CONNECTING USB WEBCAM...</span>
                   <span className="text-[10px] opacity-70">
-                    ALLOW CAMERA PERMISSION TO DETECT MICRO-EXPRESSIONS
+                    ALLOW CAMERA PERMISSION FOR AFFECT TRACKING
                   </span>
                 </div>
               )}
 
-              {/* Viewfinder Dimming Overlay (Controlled by Paranoia) */}
+              {/* Viewfinder Dimming Overlay */}
               <div
                 className="absolute inset-0 bg-black pointer-events-none transition-opacity duration-1000"
                 style={{ opacity: Math.abs(viewfinderDim) }}
               />
 
-              {/* Creeping Shadow Silhouette Overlay (Stages 1 to 3) */}
-              {shadowStage >= 1 && (
-                <div
-                  className={`absolute pointer-events-none transition-all duration-700 ease-out ${
-                    shadowStage === 1
-                      ? "top-4 right-4 w-20 h-28 opacity-45 blur-[2px] scale-90"
-                      : shadowStage === 2
-                      ? "top-8 right-12 w-28 h-40 opacity-75 blur-[1px] scale-110"
-                      : "top-12 right-20 w-36 h-52 opacity-95 blur-none scale-125"
-                  }`}
-                >
-                  <svg
-                    viewBox="0 0 100 140"
-                    className="w-full h-full fill-neutral-950 drop-shadow-[0_0_12px_rgba(0,0,0,0.9)]"
-                  >
-                    <circle cx="50" cy="30" r="22" />
-                    <ellipse cx="50" cy="95" rx="35" ry="45" />
-                    {shadowStage >= 2 && (
-                      <>
-                        <circle cx="43" cy="28" r="1.5" fill="#f0fdf4" opacity="0.8" />
-                        <circle cx="57" cy="28" r="1.5" fill="#f0fdf4" opacity="0.8" />
-                      </>
-                    )}
-                  </svg>
-                </div>
-              )}
+              {/* EERIE SPECTRAL GHOST FIGURE IN YOUR ROOM BEHIND YOUR SHOULDER */}
+              <GhostFigure stage={shadowStage} />
 
               {/* Retro Viewfinder Grid Lines */}
               <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-2 text-[10px] font-mono text-white/40">
@@ -407,7 +440,9 @@ export default function Home() {
                 </div>
                 <div className="flex justify-between items-end">
                   <span className="text-[9px] text-white/60">CH-01_ROOM_MONITOR</span>
-                  <span>{shadowStage > 0 ? "ANOMALY: BEHIND_SUBJECT" : "SUBJECT: ACTIVE"}</span>
+                  <span className={shadowStage > 0 ? "text-red-300 font-bold" : "text-white/60"}>
+                    {shadowStage > 0 ? "SPECTRAL ANOMALY: BEHIND YOU" : "SUBJECT: ACTIVE"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -436,7 +471,7 @@ export default function Home() {
 
       {/* WINDOW 3: Creepy Notepad (README.txt Lore) */}
       {readmeOpen && (
-        <div className="fixed top-20 left-12 md:left-24 w-[310px] md:w-[380px] bg-[#c0c0c0] win98-bevel-out shadow-2xl z-40">
+        <div className="fixed top-24 left-12 md:left-24 w-[310px] md:w-[380px] bg-[#c0c0c0] win98-bevel-out shadow-2xl z-40">
           <div className="win98-titlebar flex items-center justify-between px-2 py-1">
             <div className="flex items-center gap-1 text-xs text-white">
               <FileText className="w-3.5 h-3.5" />
@@ -539,7 +574,7 @@ export default function Home() {
             <span className="font-bold text-blue-900">[1]</span> Glitch & Error
           </div>
           <div className="bg-white p-1 win98-bevel-in">
-            <span className="font-bold text-blue-900">[2]</span> Shadow ({shadowStage}/3)
+            <span className="font-bold text-blue-900">[2]</span> Ghost ({shadowStage}/3)
           </div>
           <div className="bg-white p-1 win98-bevel-in">
             <span className="font-bold text-red-900">[3]</span> Face Polaroid

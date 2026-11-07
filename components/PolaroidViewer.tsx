@@ -13,7 +13,7 @@ interface PolaroidViewerProps {
 /**
  * PolaroidViewer Component
  * Captures the player's live face and synthesizes an eerie, aged polaroid snapshot
- * with a spectral shadow figure standing in their actual room behind them.
+ * with a spectral ghostly figure standing in their actual room behind them.
  */
 export const PolaroidViewer: React.FC<PolaroidViewerProps> = ({
   isOpen,
@@ -21,11 +21,10 @@ export const PolaroidViewer: React.FC<PolaroidViewerProps> = ({
   videoRef,
   shadowStage,
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [timestamp, setTimestamp] = useState<string>("");
 
-  // Function to capture frame and composite the spectral figure
+  // Function to capture frame and composite the ghostly entity
   const captureAndRenderPolaroid = () => {
     const video = videoRef.current;
     if (!video || video.readyState < 2) return;
@@ -43,50 +42,72 @@ export const PolaroidViewer: React.FC<PolaroidViewerProps> = ({
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     ctx.restore();
 
-    // 2. Apply vintage polaroid camera grading (slight desaturation, vintage grain)
-    ctx.fillStyle = "rgba(40, 25, 10, 0.15)";
+    // 2. Vintage camera grading (slight desaturation and sepia tone)
+    ctx.fillStyle = "rgba(35, 25, 15, 0.12)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 3. Composite ghostly shadow silhouette lurking behind shoulder
-    const shadowOpacity = Math.max(0.45, Math.min(0.85, 0.35 + shadowStage * 0.18));
+    // 3. Composite Pale Spectral Ghost Figure in the room behind the shoulder
+    const ghostX = canvas.width * 0.22;
+    const ghostY = canvas.height * 0.26;
+    const effectiveStage = Math.max(1, shadowStage);
+
     ctx.save();
-    ctx.fillStyle = `rgba(10, 12, 10, ${shadowOpacity})`;
-    ctx.filter = "blur(5px)";
 
-    // Shadow head & shoulders in the background corner
-    const shadowX = canvas.width * 0.22;
-    const shadowY = canvas.height * 0.28;
-
+    // Ghostly Outer Glow
+    const glow = ctx.createRadialGradient(ghostX, ghostY, 10, ghostX, ghostY, 65);
+    glow.addColorStop(0, "rgba(220, 245, 235, 0.7)");
+    glow.addColorStop(0.5, "rgba(160, 215, 200, 0.4)");
+    glow.addColorStop(1, "rgba(20, 40, 30, 0)");
+    ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(shadowX, shadowY, 32, 0, Math.PI * 2); // Head
+    ctx.arc(ghostX, ghostY, 65, 0, Math.PI * 2);
     ctx.fill();
 
+    // Ghost Pale Head Oval
+    ctx.fillStyle = "rgba(230, 245, 240, 0.82)";
     ctx.beginPath();
-    ctx.ellipse(shadowX, shadowY + 65, 48, 60, 0, 0, Math.PI * 2); // Torso/shoulders
+    ctx.ellipse(ghostX, ghostY, 26, 34, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Subtle haunting glowing eye pinpricks if high paranoia
-    if (shadowStage >= 2) {
-      ctx.filter = "none";
-      ctx.fillStyle = "rgba(220, 240, 220, 0.85)";
-      ctx.beginPath();
-      ctx.arc(shadowX - 9, shadowY - 4, 2, 0, Math.PI * 2);
-      ctx.arc(shadowX + 9, shadowY - 4, 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // Ghost Wispy Shroud/Shoulders
+    ctx.fillStyle = "rgba(150, 205, 190, 0.55)";
+    ctx.beginPath();
+    ctx.ellipse(ghostX, ghostY + 48, 42, 45, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Sunken Black Eye Sockets
+    ctx.fillStyle = "#0a120e";
+    ctx.beginPath();
+    ctx.ellipse(ghostX - 10, ghostY - 3, 5, 8, 0, 0, Math.PI * 2);
+    ctx.ellipse(ghostX + 10, ghostY - 3, 5, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Glowing Spectral Eye Pinpricks
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(ghostX - 10, ghostY - 3, 2, 0, Math.PI * 2);
+    ctx.arc(ghostX + 10, ghostY - 3, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Distorted Hollow Mouth
+    ctx.fillStyle = "#070c09";
+    ctx.beginPath();
+    ctx.ellipse(ghostX, ghostY + 16, 4, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.restore();
 
-    // 4. Subtle circular vignette
+    // 4. Subtle Vignette
     const vignette = ctx.createRadialGradient(
       canvas.width / 2,
       canvas.height / 2,
-      canvas.width * 0.25,
+      canvas.width * 0.3,
       canvas.width / 2,
       canvas.height / 2,
       canvas.width * 0.75
     );
     vignette.addColorStop(0, "rgba(0,0,0,0)");
-    vignette.addColorStop(1, "rgba(10,15,10,0.6)");
+    vignette.addColorStop(1, "rgba(10,15,10,0.5)");
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -127,16 +148,16 @@ export const PolaroidViewer: React.FC<PolaroidViewerProps> = ({
         <div className="p-4 flex flex-col items-center">
           {/* Physical Polaroid Card */}
           <div className="polaroid-frame p-3 pb-8 rounded-sm w-[300px] flex flex-col items-center text-neutral-800 transition-transform duration-300 hover:rotate-1">
-            {/* The Photo itself */}
+            {/* The Photo */}
             <div className="w-[276px] h-[276px] bg-black overflow-hidden relative border border-neutral-300">
               {photoDataUrl ? (
                 <img
                   src={photoDataUrl}
                   alt="Captured face Polaroid"
-                  className="w-full h-full object-cover filter contrast-[1.15]"
+                  className="w-full h-full object-cover filter contrast-[1.12]"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-xs text-neutral-400">
+                <div className="w-full h-full flex items-center justify-center text-xs text-neutral-400 font-mono">
                   DEVELOPING FILM...
                 </div>
               )}
