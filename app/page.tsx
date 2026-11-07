@@ -11,6 +11,7 @@ import {
   Eye,
   Camera,
   FileText,
+  RefreshCw,
 } from "lucide-react";
 import { WindowsTaskbar } from "@/components/WindowsTaskbar";
 import { DesktopIcons } from "@/components/DesktopIcons";
@@ -46,14 +47,10 @@ export default function Home() {
   // Clown Entity Stage: "none" | "standing_far" | "near_unsmiling" | "jumpscare_smiling"
   const [clownStage, setClownStage] = useState<ClownStage>("none");
 
-  // Psychological Story Arc Step
-  // 0: Calibration/Casual -> 1: Far Clown Spawn -> 2: Turned & Vanished -> 3: Cutoff & Glitch -> 4: Reconnected -> 5: Creeping Near -> 6: Jumpscare
-  const [storyStep, setStoryStep] = useState<number>(0);
-
   // Paranoia & FX States
   const [glitchActive, setGlitchActive] = useState(false);
   const [viewfinderShake, setViewfinderShake] = useState(false);
-  const [viewfinderDim, setViewfinderDim] = useState(0);
+  const [viewfinderDim, setViewfinderDim] = useState(0); // Clamped between 0 and 0.4
   const [screenCracked, setScreenCracked] = useState(false);
   const [crackSeverity, setCrackSeverity] = useState<1 | 2 | 3>(1);
   const [textDriftTrigger, setTextDriftTrigger] = useState(false);
@@ -74,12 +71,14 @@ export default function Home() {
     },
   ]);
   const [inputText, setInputText] = useState("");
+  const [isAiTyping, setIsAiTyping] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
   const typingAudioPitch = useRef<number>(1.0);
 
-  // Typewriter character sound effect
+  // Typewriter audio playback
   const playTypewriterForText = useCallback((text: string) => {
     let index = 0;
     const interval = setInterval(() => {
@@ -88,10 +87,10 @@ export default function Home() {
       if (index >= text.length) {
         clearInterval(interval);
       }
-    }, 45);
+    }, 40);
   }, []);
 
-  // Trigger violent screen glitch
+  // Violent screen glitch
   const triggerGlitchSpike = useCallback(() => {
     setGlitchActive(true);
     soundEngine.playGlitchSting();
@@ -116,12 +115,9 @@ export default function Home() {
 
   // HEAD-TURN DETECTED (|headYaw| > 18 deg)
   const handleHeadTurn = useCallback(() => {
-    // If the clown was standing in the far corner, turning around causes it to DISAPPEAR!
     if (clownStage === "standing_far") {
       setClownStage("none"); // It vanishes!
-      setStoryStep(2);
 
-      // Mid-sentence cutoff sequence
       setTimeout(() => {
         soundEngine.stopAllSound();
         setMessages((prev) => [
@@ -133,7 +129,6 @@ export default function Home() {
           },
         ]);
 
-        // Glitch & Simulated Disconnect
         triggerGlitchSpike();
         setScreenCracked(true);
         setCrackSeverity(1);
@@ -148,31 +143,28 @@ export default function Home() {
             },
           ]);
 
-          // Reconnect casually after 3 seconds
           setTimeout(() => {
             typingAudioPitch.current = 0.75;
             soundEngine.startAmbientDrone();
-            setStoryStep(4);
+            const reMsg = "sorry about that. glitch in the line. what were we talking about?";
             setMessages((prev) => [
               ...prev,
               {
                 id: `pond-reconnect-${Date.now()}`,
                 sender: "pond",
-                text: "sorry about that. glitch in the line. what were we talking about?",
+                text: reMsg,
               },
             ]);
-            playTypewriterForText("sorry about that. glitch in the line. what were we talking about?");
+            playTypewriterForText(reMsg);
           }, 3000);
         }, 1200);
       }, 700);
     }
   }, [clownStage, triggerGlitchSpike, playTypewriterForText]);
 
-  // GAZE AT VIEWFINDER DETECTED (Player looks directly at the clown window!)
+  // GAZE AT VIEWFINDER DETECTED (Looking directly at clown in top-right)
   const handleViewfinderGaze = useCallback(() => {
-    // If the clown is near behind the chair and player looks right at it:
     if (clownStage === "near_unsmiling") {
-      // 1. Intruder message from "unknown"
       setMessages((prev) => [
         ...prev,
         {
@@ -183,7 +175,6 @@ export default function Home() {
       ]);
       soundEngine.stopAllSound();
 
-      // 2. Jumpscare after brief dread pause
       setTimeout(() => {
         triggerJumpscare();
       }, 900);
@@ -198,31 +189,53 @@ export default function Home() {
     onViewfinderGaze: handleViewfinderGaze,
   });
 
-  // Initialize Webcam (Natural early 2000s CMOS styling)
-  useEffect(() => {
-    async function initCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480, facingMode: "user" },
-          audio: false,
-        });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          setCameraActive(true);
-        }
-      } catch (err) {
-        console.warn("Camera access denied or unavailable:", err);
+  // ROBUST CAMERA INITIALIZATION & ATTACHMENT
+  const startCamera = useCallback(async () => {
+    try {
+      if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+        console.warn("getUserMedia not available");
+        return;
       }
+
+      // Stop any existing tracks
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: "user",
+        },
+        audio: false,
+      });
+
+      mediaStreamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch((e) => console.warn("Video play promise error:", e));
+        };
+        videoRef.current.play().catch(() => {});
+      }
+      setCameraActive(true);
+    } catch (err) {
+      console.warn("Camera init failed:", err);
+      setCameraActive(false);
     }
-    initCamera();
+  }, []);
+
+  useEffect(() => {
+    startCamera();
 
     return () => {
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach((track) => track.stop());
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
-  }, []);
+  }, [startCamera]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -242,11 +255,9 @@ export default function Home() {
       }
 
       if (e.key === "1") {
-        // Glitch + Error Dialog
         triggerGlitchSpike();
         setErrorDialogOpen(true);
       } else if (e.key === "2") {
-        // Cycle Clown Stage manually for testing
         setClownStage((prev) =>
           prev === "none"
             ? "standing_far"
@@ -257,19 +268,14 @@ export default function Home() {
             : "none"
         );
       } else if (e.key === "3") {
-        // Open live creepy face Polaroid
         setActiveWindows((prev) => ({ ...prev, polaroid: true }));
       } else if (e.key === "4") {
-        // Toggle screen glass fracture cracks
         setScreenCracked((prev) => !prev);
         setCrackSeverity((prev) => (prev === 3 ? 1 : ((prev + 1) as 1 | 2 | 3)));
       } else if (e.key === "5") {
-        // Trigger Gaze Trap & Jumpscare manually
         handleViewfinderGaze();
       } else if (e.key === "6") {
-        // Reset Story Arc to Start
         setClownStage("none");
-        setStoryStep(0);
         setScreenCracked(false);
         typingAudioPitch.current = 1.0;
         setMessages([
@@ -291,10 +297,10 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [triggerGlitchSpike, handleViewfinderGaze]);
 
-  // User sends message in POND Messenger
-  const handleSendMessage = (e: React.FormEvent) => {
+  // SEND MESSAGE TO GEMINI / PSYCHOLOGICAL BACKEND
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || isAiTyping) return;
 
     const userText = inputText.trim();
     const userMsg: ChatMessage = {
@@ -303,58 +309,75 @@ export default function Home() {
       text: userText,
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setInputText("");
+    setIsAiTyping(true);
 
-    // Psychological Narrative Script progression based on storyStep:
-    setTimeout(() => {
-      if (storyStep === 0) {
-        // Calibration 1 -> ask if in room
-        const reply = "cool. thanks for hopping on. are you in your room right now?";
-        setMessages((prev) => [
-          ...prev,
-          { id: `pond-${Date.now()}`, sender: "pond", text: reply },
-        ]);
-        playTypewriterForText(reply);
-        setStoryStep(1);
-      } else if (storyStep === 1) {
-        // Calibration 2 -> trigger the far clown standing
-        const reply = "wait... who's behind you?";
-        setMessages((prev) => [
-          ...prev,
-          { id: `pond-${Date.now()}`, sender: "pond", text: reply },
-        ]);
-        playTypewriterForText(reply);
+    try {
+      // Call Gemini 2.5 Flash route with player telemetry
+      const res = await fetch("/api/pond", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: newMessages,
+          telemetry,
+        }),
+      });
 
-        // Spawn Clown far away in the back corner!
-        setTimeout(() => {
-          setClownStage("standing_far");
-        }, 800);
-      } else if (storyStep === 4) {
-        // Reconnected -> noticing subtle wrong details
-        const reply = "your door was closed earlier, right?";
-        setMessages((prev) => [
-          ...prev,
-          { id: `pond-${Date.now()}`, sender: "pond", text: reply },
-        ]);
-        playTypewriterForText(reply);
-        setStoryStep(5);
-      } else if (storyStep === 5) {
-        // Creeping near & warn not to look
-        const reply = "do not look at your viewfinder. it only moves when you look.";
-        setMessages((prev) => [
-          ...prev,
-          { id: `pond-${Date.now()}`, sender: "pond", text: reply },
-        ]);
-        playTypewriterForText(reply);
+      const data = await res.json();
 
-        // Reappear closer behind chair!
-        setTimeout(() => {
+      if (data && data.dialogue) {
+        if (data.audioPitch) {
+          typingAudioPitch.current = data.audioPitch;
+        }
+
+        if (data.clownStage && data.clownStage !== "none" && clownStage === "none") {
+          setClownStage(data.clownStage as ClownStage);
+        } else if (data.clownStage === "near_unsmiling") {
           setClownStage("near_unsmiling");
-          setViewfinderDim(-0.25);
-        }, 1200);
+        }
+
+        if (data.triggerGlitch) {
+          triggerGlitchSpike();
+        }
+
+        if (data.viewfinderShake) {
+          setViewfinderShake(true);
+          setTimeout(() => setViewfinderShake(false), 800);
+        }
+
+        if (data.textDriftEffect) {
+          setTextDriftTrigger(true);
+        }
+
+        if (typeof data.viewfinderDimDelta === "number") {
+          setViewfinderDim((prev) => Math.min(0.4, Math.max(0, prev + Math.abs(data.viewfinderDimDelta))));
+        }
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `pond-${Date.now()}`,
+            sender: "pond",
+            text: data.dialogue,
+            isDrifting: data.textDriftEffect,
+          },
+        ]);
+
+        playTypewriterForText(data.dialogue);
       }
-    }, 1100);
+    } catch (err) {
+      console.warn("Backend chat error:", err);
+      const fallbackReply = "are you still listening?";
+      setMessages((prev) => [
+        ...prev,
+        { id: `pond-${Date.now()}`, sender: "pond", text: fallbackReply },
+      ]);
+      playTypewriterForText(fallbackReply);
+    } finally {
+      setIsAiTyping(false);
+    }
   };
 
   return (
@@ -363,7 +386,7 @@ export default function Home() {
         glitchActive ? "screen-glitch" : ""
       }`}
     >
-      {/* Subtle CRT Scanlines */}
+      {/* CRT Scanlines Overlay */}
       <div className="retro-crt-lines" aria-hidden="true" />
 
       {/* Screen Crack Glass Shatter Overlay */}
@@ -460,7 +483,7 @@ export default function Home() {
                       : msg.sender === "pond"
                       ? "text-neutral-900 font-medium"
                       : "text-neutral-500 italic text-[11px]"
-                  } ${textDriftTrigger && msg.sender === "pond" ? "text-drift-fall" : ""}`}
+                  } ${(textDriftTrigger || msg.isDrifting) && msg.sender === "pond" ? "text-drift-fall" : ""}`}
                 >
                   <span className="font-bold mr-1.5">
                     {msg.sender === "user"
@@ -483,13 +506,15 @@ export default function Home() {
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="type your response..."
-                className="flex-1 win98-bevel-in px-2 py-1 text-xs font-mono bg-white outline-none"
+                placeholder={isAiTyping ? "pond is typing..." : "type your response..."}
+                disabled={isAiTyping}
+                className="flex-1 win98-bevel-in px-2 py-1 text-xs font-mono bg-white outline-none disabled:bg-neutral-100"
                 autoFocus
               />
               <button
                 type="submit"
-                className="win98-bevel-button px-3 py-1 text-xs font-sans text-black font-semibold"
+                disabled={isAiTyping}
+                className="win98-bevel-button px-3 py-1 text-xs font-sans text-black font-semibold disabled:opacity-50"
               >
                 Send
               </button>
@@ -498,14 +523,13 @@ export default function Home() {
         </div>
       )}
 
-      {/* WINDOW 2: Video Call Viewfinder Window with Player's Clown Entity */}
+      {/* WINDOW 2: Video Call Viewfinder Window */}
       {activeWindows.viewfinder && (
         <div
           className={`absolute top-14 right-4 md:right-8 w-[320px] md:w-[380px] bg-[#c0c0c0] win98-bevel-out shadow-2xl z-20 ${
             viewfinderShake ? "viewfinder-shake" : ""
           }`}
           onMouseEnter={() => {
-            // Mouse hover also triggers gaze detection if near clown
             if (clownStage === "near_unsmiling") {
               handleViewfinderGaze();
             }
@@ -548,7 +572,13 @@ export default function Home() {
             <div className="relative aspect-[4/3] w-full bg-black win98-bevel-in overflow-hidden flex items-center justify-center">
               {/* Natural Live Webcam Video Feed */}
               <video
-                ref={videoRef}
+                ref={(el) => {
+                  videoRef.current = el;
+                  if (el && mediaStreamRef.current && el.srcObject !== mediaStreamRef.current) {
+                    el.srcObject = mediaStreamRef.current;
+                    el.play().catch(() => {});
+                  }
+                }}
                 autoPlay
                 playsInline
                 muted
@@ -557,27 +587,36 @@ export default function Home() {
                 }`}
               />
 
+              {/* Re-attach button / fallback if camera is not active */}
               {!cameraActive && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-neutral-400 text-xs gap-2 p-4 text-center">
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-neutral-400 text-xs gap-2 p-4 text-center bg-black/80">
                   <Eye className="w-8 h-8 opacity-50 animate-pulse text-neutral-300" />
-                  <span className="font-mono">CONNECTING USB WEBCAM...</span>
-                  <span className="text-[10px] opacity-70">
-                    ALLOW CAMERA PERMISSION FOR AFFECT TRACKING
-                  </span>
+                  <span className="font-mono">CAMERA PERMISSION REQUIRED</span>
+                  <button
+                    onClick={startCamera}
+                    className="win98-bevel-button px-3 py-1.5 text-xs text-black font-semibold flex items-center gap-1.5 mt-1"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Enable Camera Feed
+                  </button>
                 </div>
               )}
 
-              {/* Viewfinder Dimming Overlay */}
+              {/* Viewfinder Dimming Overlay (Paranoia effect) */}
               <div
-                className="absolute inset-0 bg-black pointer-events-none transition-opacity duration-1000"
-                style={{ opacity: Math.abs(viewfinderDim) }}
+                className="absolute inset-0 bg-black pointer-events-none transition-opacity duration-1000 z-[5]"
+                style={{ opacity: Math.min(0.4, Math.abs(viewfinderDim)) }}
               />
 
               {/* CLOWN ENTITY IN VIEWFINDER: standing far or creeping near behind chair */}
-              {clownStage !== "jumpscare_smiling" && <ClownEntity stage={clownStage} />}
+              {clownStage !== "jumpscare_smiling" && (
+                <div className="relative z-[6]">
+                  <ClownEntity stage={clownStage} />
+                </div>
+              )}
 
               {/* Retro Viewfinder Grid Lines */}
-              <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-2 text-[10px] font-mono text-white/40">
+              <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-2 text-[10px] font-mono text-white/50 z-[7]">
                 <div className="flex justify-between">
                   <span>[REC] 00:01:42</span>
                   <span>AUTO-EXPOSURE</span>
@@ -604,14 +643,23 @@ export default function Home() {
                 <Camera className="w-3.5 h-3.5 text-neutral-800" />
                 Snapshot Polaroid
               </button>
-              <button
-                onClick={() =>
-                  setWebcamMode((prev) => (prev === "vintage" ? "corrupted" : "vintage"))
-                }
-                className="text-[11px] text-neutral-700 underline font-sans hover:text-black"
-              >
-                Toggle Night Vision
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={startCamera}
+                  title="Reconnect Camera"
+                  className="win98-bevel-button p-1 text-neutral-700 hover:text-black"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() =>
+                    setWebcamMode((prev) => (prev === "vintage" ? "corrupted" : "vintage"))
+                  }
+                  className="text-[11px] text-neutral-700 underline font-sans hover:text-black"
+                >
+                  Toggle Night Vision
+                </button>
+              </div>
             </div>
           </div>
         </div>
