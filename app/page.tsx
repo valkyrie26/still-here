@@ -1,12 +1,23 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Terminal, ShieldAlert, Radio, Eye, Video } from "lucide-react";
+import {
+  Video,
+  MessageSquare,
+  X,
+  Minus,
+  Square,
+  AlertOctagon,
+  Eye,
+  Camera,
+  FileText,
+} from "lucide-react";
+import { WindowsTaskbar } from "@/components/WindowsTaskbar";
+import { DesktopIcons } from "@/components/DesktopIcons";
+import { PolaroidViewer } from "@/components/PolaroidViewer";
+import { ScreenCrack } from "@/components/ScreenCrack";
 
-/**
- * Message representation in the POND_OS terminal
- */
-interface TerminalMessage {
+interface ChatMessage {
   id: string;
   sender: "pond" | "user" | "system";
   text: string;
@@ -14,34 +25,52 @@ interface TerminalMessage {
 }
 
 export default function Home() {
-  // UI & Paranoia States
-  const [messages, setMessages] = useState<TerminalMessage[]>([
+  // Window Visibility States
+  const [activeWindows, setActiveWindows] = useState({
+    chat: true,
+    viewfinder: true,
+    polaroid: false,
+  });
+
+  // Dialog & Horror Popups
+  const [readmeOpen, setReadmeOpen] = useState(false);
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(
+    "FATAL EXCEPTION 0E : An unknown presence was detected in your physical space."
+  );
+
+  // Paranoia & Horror States
+  const [glitchActive, setGlitchActive] = useState(false);
+  const [viewfinderShake, setViewfinderShake] = useState(false);
+  const [viewfinderDim, setViewfinderDim] = useState(0); // 0 to -0.6
+  const [shadowStage, setShadowStage] = useState<number>(0); // 0 to 3
+  const [screenCracked, setScreenCracked] = useState(false);
+  const [crackSeverity, setCrackSeverity] = useState<1 | 2 | 3>(1);
+  const [textDriftTrigger, setTextDriftTrigger] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [webcamMode, setWebcamMode] = useState<"vintage" | "corrupted">("vintage");
+
+  // Chat Feed State
+  const [messages, setMessages] = useState<ChatMessage[]>([
     {
-      id: "sys-init",
+      id: "sys-0",
       sender: "system",
-      text: "POND_OS v3.1 [DAEMON_LOADED] // SECURE TERMINAL ESTABLISHED",
+      text: "POND_OS 99 [DAEMON_LOADED] // SECURE SESSION #4092-A",
     },
     {
-      id: "pond-hello",
+      id: "pond-init",
       sender: "pond",
       text: "hello. can you see me clearly?",
     },
   ]);
-
   const [inputText, setInputText] = useState("");
-  const [glitchActive, setGlitchActive] = useState(false);
-  const [viewfinderShake, setViewfinderShake] = useState(false);
-  const [viewfinderDim, setViewfinderDim] = useState(0); // 0 to -0.6
-  const [shadowStage, setShadowStage] = useState<number>(0); // 0: hidden, 1: far corner, 2: closer, 3: behind shoulder
-  const [textDriftTrigger, setTextDriftTrigger] = useState(false);
-  const [cameraActive, setCameraActive] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
-  // Initialize Webcam for Self-Viewfinder
+  // Initialize Webcam (Natural early 2000s CMOS styling, toned down green)
   useEffect(() => {
-    async function startCamera() {
+    async function initCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { width: 640, height: 480, facingMode: "user" },
@@ -55,7 +84,7 @@ export default function Home() {
         console.warn("Camera access denied or unavailable:", err);
       }
     }
-    startCamera();
+    initCamera();
 
     return () => {
       if (videoRef.current && videoRef.current.srcObject) {
@@ -70,7 +99,18 @@ export default function Home() {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Keyboard Debug Shortcuts (1-4, Space)
+  // Window Toggling
+  const handleToggleWindow = (key: "chat" | "viewfinder" | "polaroid") => {
+    setActiveWindows((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // Trigger Glitch & Horror Tear
+  const triggerGlitchSpike = () => {
+    setGlitchActive(true);
+    setTimeout(() => setGlitchActive(false), 380);
+  };
+
+  // Keyboard Shortcuts (1 to 6)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -78,17 +118,24 @@ export default function Home() {
       }
 
       if (e.key === "1") {
-        // Trigger 350ms glitch tear
-        setGlitchActive(true);
-        setTimeout(() => setGlitchActive(false), 350);
+        // Glitch + Error Dialog
+        triggerGlitchSpike();
+        setErrorDialogOpen(true);
       } else if (e.key === "2") {
-        // Cycle shadow silhouette stage (0 -> 1 -> 2 -> 3 -> 0)
+        // Cycle Shadow behind shoulder
         setShadowStage((prev) => (prev + 1) % 4);
       } else if (e.key === "3") {
-        // Toggle viewfinder camera shake
-        setViewfinderShake((prev) => !prev);
+        // Open live creepy face Polaroid
+        setActiveWindows((prev) => ({ ...prev, polaroid: true }));
       } else if (e.key === "4") {
-        // Trigger text drift
+        // Toggle screen glass fracture cracks
+        setScreenCracked((prev) => !prev);
+        setCrackSeverity((prev) => (prev === 3 ? 1 : ((prev + 1) as 1 | 2 | 3)));
+      } else if (e.key === "5") {
+        // Toggle camera shake
+        setViewfinderShake((prev) => !prev);
+      } else if (e.key === "6") {
+        // Toggle text falling
         setTextDriftTrigger((prev) => !prev);
       }
     }
@@ -101,7 +148,7 @@ export default function Home() {
     e.preventDefault();
     if (!inputText.trim()) return;
 
-    const userMsg: TerminalMessage = {
+    const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       sender: "user",
       text: inputText.trim(),
@@ -109,215 +156,413 @@ export default function Home() {
 
     setMessages((prev) => [...prev, userMsg]);
     setInputText("");
+
+    // Simulated conversational escalation for testing
+    setTimeout(() => {
+      if (messages.length === 2) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `pond-${Date.now()}`,
+            sender: "pond",
+            text: "your room is very quiet today.",
+          },
+        ]);
+      } else if (messages.length === 4) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `pond-${Date.now()}`,
+            sender: "pond",
+            text: "who's behind you?",
+          },
+        ]);
+        setShadowStage(1);
+      }
+    }, 1200);
   };
 
   return (
     <main
-      className={`min-h-screen w-full flex flex-col p-4 md:p-6 bg-void text-crt-green selection:bg-crt-green selection:text-black font-mono transition-all duration-300 ${
+      className={`min-h-screen w-full relative overflow-hidden bg-[#008080] select-none font-sans ${
         glitchActive ? "screen-glitch" : ""
       }`}
     >
-      {/* Top Header: POND_OS Status Banner */}
-      <header className="border-b border-crt-dim/60 pb-3 mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Terminal className="w-5 h-5 text-crt-green animate-pulse" />
-          <h1 className="text-lg md:text-xl font-bold tracking-widest phosphor-glow">
-            POND_OS v3.1 // BLUE_DUCK_DAEMON
-          </h1>
-        </div>
+      {/* Subtle CRT Scanlines */}
+      <div className="retro-crt-lines" aria-hidden="true" />
 
-        <div className="flex items-center gap-4 text-xs tracking-wider text-crt-bright">
-          <span className="flex items-center gap-1.5 border border-crt-dim px-2 py-0.5 rounded bg-black/40">
-            <Radio className="w-3.5 h-3.5 text-crt-bright animate-ping" />
-            FEED: ACTIVE
-          </span>
-          <span className="flex items-center gap-1.5 border border-crt-dim px-2 py-0.5 rounded bg-black/40">
-            <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
-            TELEMETRY: STANDBY
-          </span>
-          <span className="hidden sm:inline text-crt-dim">PORT: 8084-SEC</span>
-        </div>
-      </header>
+      {/* Screen Crack Glass Shatter Overlay */}
+      <ScreenCrack active={screenCracked} severity={crackSeverity} />
 
-      {/* Main Terminal Workspace */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 min-h-0">
-        {/* Left Column: Teletype Chat Feed (7 cols) */}
-        <section className="lg:col-span-7 flex flex-col border border-crt-dim/50 rounded bg-black/60 p-4 relative backdrop-blur-sm shadow-[0_0_15px_rgba(32,194,14,0.1)]">
-          <div className="border-b border-crt-dim/40 pb-2 mb-3 flex items-center justify-between text-xs text-crt-dim">
-            <span>TERMINAL_SESSION: #4092-A</span>
-            <span>ENCRYPTION: QUANTUM_STREAM</span>
-          </div>
+      {/* Virtual Desktop Icons */}
+      <DesktopIcons
+        onOpenPolaroid={() => setActiveWindows((prev) => ({ ...prev, polaroid: true }))}
+        onOpenReadme={() => setReadmeOpen(true)}
+        onTriggerError={() => {
+          setErrorMessage("SYSTEM ANOMALY: Access denied. Unauthorized observer detected.");
+          setErrorDialogOpen(true);
+        }}
+        anomaliesDiscovered={shadowStage}
+      />
 
-          {/* Chat Messages Log */}
-          <div className="flex-1 overflow-y-auto space-y-3 pr-2 mb-4 scrollbar-thin">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`text-sm md:text-base leading-relaxed ${
-                  msg.sender === "user"
-                    ? "text-emerald-400 pl-4 border-l border-emerald-600/50"
-                    : msg.sender === "pond"
-                    ? "text-crt-bright phosphor-glow"
-                    : "text-crt-dim italic text-xs"
-                } ${textDriftTrigger && msg.sender === "pond" ? "text-drift-fall" : ""}`}
-              >
-                <span className="text-xs text-crt-dim mr-2 opacity-70">
-                  {msg.sender === "user" ? "[YOU]:" : msg.sender === "pond" ? "[POND]:" : "[SYS]:"}
-                </span>
-                <span>{msg.text}</span>
-              </div>
-            ))}
-            <div ref={chatBottomRef} />
-          </div>
-
-          {/* User Input Prompt */}
-          <form onSubmit={handleSendMessage} className="relative mt-auto pt-2 border-t border-crt-dim/40 flex items-center">
-            <span className="text-crt-green mr-2 text-sm">&gt;</span>
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="type your response..."
-              className="flex-1 bg-transparent border-none outline-none text-crt-bright placeholder:text-crt-dim/60 text-sm md:text-base caret-crt-bright"
-              autoFocus
-            />
-            <button
-              type="submit"
-              className="ml-2 text-xs border border-crt-dim px-3 py-1 hover:bg-crt-green hover:text-black transition-colors"
-            >
-              SEND [↵]
-            </button>
-          </form>
-        </section>
-
-        {/* Right Column: Dynamic Surveillance Viewfinder (5 cols) */}
-        <section className="lg:col-span-5 flex flex-col gap-4">
-          <div className="border border-crt-dim/60 rounded bg-black/80 p-3 relative flex flex-col shadow-[0_0_20px_rgba(15,89,7,0.25)]">
-            {/* Viewfinder Header */}
-            <div className="flex items-center justify-between text-xs pb-2 border-b border-crt-dim/40 mb-2">
-              <span className="flex items-center gap-1.5 text-crt-green">
-                <Video className="w-3.5 h-3.5" />
-                CAM_SURVEILLANCE // CH-01
-              </span>
-              <span className="text-amber-400 animate-pulse font-bold flex items-center gap-1">
-                <span className="text-xs">🦆</span> DUCK_REC [●]
+      {/* WINDOW 1: POND Instant Messenger (Windows 98 Style) */}
+      {activeWindows.chat && (
+        <div
+          className={`absolute top-6 left-28 md:left-36 w-[340px] md:w-[480px] bg-[#c0c0c0] win98-bevel-out shadow-2xl z-30 transition-all ${
+            shadowStage >= 2 ? "border-red-900" : ""
+          }`}
+          style={{ maxHeight: "calc(100vh - 80px)" }}
+        >
+          {/* Title Bar */}
+          <div
+            className={`flex items-center justify-between px-2 py-1 select-none ${
+              shadowStage >= 2 ? "win98-titlebar-corrupted" : "win98-titlebar"
+            }`}
+          >
+            <div className="flex items-center gap-1.5 text-xs text-white">
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>
+                {shadowStage >= 2 ? "POND_OS // WHO_IS_THERE?" : "POND Instant Messenger v3.1"}
               </span>
             </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => handleToggleWindow("chat")}
+                className="win98-bevel-button w-4 h-3.5 flex items-center justify-center text-black text-[10px]"
+              >
+                <Minus className="w-2.5 h-2.5" />
+              </button>
+              <button className="win98-bevel-button w-4 h-3.5 flex items-center justify-center text-black text-[10px]">
+                <Square className="w-2.5 h-2.5" />
+              </button>
+              <button
+                onClick={() => handleToggleWindow("chat")}
+                className="win98-bevel-button w-4 h-3.5 flex items-center justify-center text-black text-[10px] font-bold"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
+          </div>
 
-            {/* Video Viewport Container */}
-            <div
-              className={`relative aspect-[4/3] w-full bg-black overflow-hidden border border-crt-dim/50 rounded flex items-center justify-center ${
-                viewfinderShake ? "viewfinder-shake" : ""
-              }`}
+          {/* Menu Strip */}
+          <div className="px-2 py-0.5 border-b border-neutral-400 text-[11px] text-neutral-800 flex gap-3 font-sans">
+            <span className="hover:underline cursor-pointer">File</span>
+            <span className="hover:underline cursor-pointer">Edit</span>
+            <span className="hover:underline cursor-pointer">View</span>
+            <span
+              onClick={() => setActiveWindows((prev) => ({ ...prev, polaroid: true }))}
+              className="hover:underline cursor-pointer text-red-900 font-semibold"
             >
-              {/* Live Webcam with green surveillance filter */}
+              Examine Photo...
+            </span>
+          </div>
+
+          {/* Chat Feed Inner Box */}
+          <div className="p-2 flex flex-col h-[340px] md:h-[400px]">
+            <div className="flex-1 bg-white win98-bevel-in p-2.5 overflow-y-auto space-y-2.5 text-xs font-mono scrollbar-thin">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`leading-relaxed ${
+                    msg.sender === "user"
+                      ? "text-blue-900"
+                      : msg.sender === "pond"
+                      ? "text-neutral-900 font-medium"
+                      : "text-neutral-500 italic text-[11px]"
+                  } ${textDriftTrigger && msg.sender === "pond" ? "text-drift-fall" : ""}`}
+                >
+                  <span className="font-bold mr-1.5">
+                    {msg.sender === "user"
+                      ? "[YOU]:"
+                      : msg.sender === "pond"
+                      ? "[POND]:"
+                      : "[SYSTEM]:"}
+                  </span>
+                  <span>{msg.text}</span>
+                </div>
+              ))}
+              <div ref={chatBottomRef} />
+            </div>
+
+            {/* Input Bar */}
+            <form onSubmit={handleSendMessage} className="mt-2 flex gap-1.5">
+              <input
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder="type your response..."
+                className="flex-1 win98-bevel-in px-2 py-1 text-xs font-mono bg-white outline-none"
+                autoFocus
+              />
+              <button
+                type="submit"
+                className="win98-bevel-button px-3 py-1 text-xs font-sans text-black font-semibold"
+              >
+                Send
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* WINDOW 2: Video Call Viewfinder Window (Natural early 2000s webcam aesthetic) */}
+      {activeWindows.viewfinder && (
+        <div
+          className={`absolute top-6 right-4 md:right-8 w-[320px] md:w-[380px] bg-[#c0c0c0] win98-bevel-out shadow-2xl z-20 ${
+            viewfinderShake ? "viewfinder-shake" : ""
+          }`}
+        >
+          {/* Title Bar */}
+          <div className="win98-titlebar flex items-center justify-between px-2 py-1 select-none">
+            <div className="flex items-center gap-1.5 text-xs text-white">
+              <Video className="w-3.5 h-3.5" />
+              <span>Video Call // USB_CAM_CH01 (640x480)</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => handleToggleWindow("viewfinder")}
+                className="win98-bevel-button w-4 h-3.5 flex items-center justify-center text-black text-[10px]"
+              >
+                <Minus className="w-2.5 h-2.5" />
+              </button>
+              <button
+                onClick={() => handleToggleWindow("viewfinder")}
+                className="win98-bevel-button w-4 h-3.5 flex items-center justify-center text-black text-[10px] font-bold"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Subheader Status */}
+          <div className="px-2 py-1 bg-neutral-200 border-b border-neutral-400 flex items-center justify-between text-[11px] text-neutral-800 font-mono">
+            <span className="flex items-center gap-1 text-red-700 font-bold">
+              <span>🦆</span> DUCK_REC [●]
+            </span>
+            <span className="text-neutral-600 text-[10px]">FPS: 30.1 // P31_CORRECTED</span>
+          </div>
+
+          {/* Video Viewport Container */}
+          <div className="p-2">
+            <div className="relative aspect-[4/3] w-full bg-black win98-bevel-in overflow-hidden flex items-center justify-center">
+              {/* Natural Live Webcam Video Feed (toned down green, authentic vintage) */}
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 muted
-                className="w-full h-full object-cover surveillance-filter -scale-x-100"
+                className={`w-full h-full object-cover -scale-x-100 ${
+                  webcamMode === "vintage" ? "webcam-vintage-natural" : "webcam-corrupted"
+                }`}
               />
 
               {!cameraActive && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-crt-dim text-xs gap-2 p-4 text-center">
-                  <Eye className="w-8 h-8 opacity-40 animate-pulse" />
-                  <span>INITIALIZING WEBCAM STREAM...</span>
-                  <span className="text-[10px] opacity-60">PLEASE ALLOW CAMERA ACCESS FOR AFFECT TELEMETRY</span>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-neutral-400 text-xs gap-2 p-4 text-center">
+                  <Eye className="w-8 h-8 opacity-50 animate-pulse text-neutral-300" />
+                  <span className="font-mono">CONNECTING USB WEBCAM...</span>
+                  <span className="text-[10px] opacity-70">
+                    ALLOW CAMERA PERMISSION TO DETECT MICRO-EXPRESSIONS
+                  </span>
                 </div>
               )}
 
-              {/* Viewfinder Dimming Overlay (Paranoia Escalation) */}
+              {/* Viewfinder Dimming Overlay (Controlled by Paranoia) */}
               <div
                 className="absolute inset-0 bg-black pointer-events-none transition-opacity duration-1000"
                 style={{ opacity: Math.abs(viewfinderDim) }}
               />
 
-              {/* Shadow Silhouette Overlays (Stages 1 to 3) */}
+              {/* Creeping Shadow Silhouette Overlay (Stages 1 to 3) */}
               {shadowStage >= 1 && (
                 <div
                   className={`absolute pointer-events-none transition-all duration-700 ease-out ${
                     shadowStage === 1
-                      ? "top-4 right-4 w-20 h-28 opacity-40 blur-[2px] scale-90"
+                      ? "top-4 right-4 w-20 h-28 opacity-45 blur-[2px] scale-90"
                       : shadowStage === 2
                       ? "top-8 right-12 w-28 h-40 opacity-75 blur-[1px] scale-110"
                       : "top-12 right-20 w-36 h-52 opacity-95 blur-none scale-125"
                   }`}
                 >
-                  {/* Creepy organic humanoid silhouette SVG */}
-                  <svg viewBox="0 0 100 140" className="w-full h-full fill-black drop-shadow-[0_0_12px_rgba(0,0,0,0.9)]">
+                  <svg
+                    viewBox="0 0 100 140"
+                    className="w-full h-full fill-neutral-950 drop-shadow-[0_0_12px_rgba(0,0,0,0.9)]"
+                  >
                     <circle cx="50" cy="30" r="22" />
                     <ellipse cx="50" cy="95" rx="35" ry="45" />
-                    {/* Glowing void eye pinpricks for higher stages */}
                     {shadowStage >= 2 && (
                       <>
-                        <circle cx="43" cy="28" r="1.5" fill="#3bf824" opacity="0.6" />
-                        <circle cx="57" cy="28" r="1.5" fill="#3bf824" opacity="0.6" />
+                        <circle cx="43" cy="28" r="1.5" fill="#f0fdf4" opacity="0.8" />
+                        <circle cx="57" cy="28" r="1.5" fill="#f0fdf4" opacity="0.8" />
                       </>
                     )}
                   </svg>
                 </div>
               )}
 
-              {/* Crosshair & Grid HUD overlay */}
-              <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-2 text-[10px] text-crt-green/40">
+              {/* Retro Viewfinder Grid Lines */}
+              <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-2 text-[10px] font-mono text-white/40">
                 <div className="flex justify-between">
-                  <span>+ [TL_BOUND]</span>
-                  <span>[TR_BOUND] +</span>
+                  <span>[REC] 00:01:42</span>
+                  <span>AUTO-EXPOSURE</span>
                 </div>
-                <div className="flex justify-center items-center text-crt-green/20">
-                  <span className="text-xl font-thin">+</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>+ [BL_BOUND]</span>
-                  <span>SHADOW_STAGE: {shadowStage}/3 +</span>
+                <div className="flex justify-between items-end">
+                  <span className="text-[9px] text-white/60">CH-01_ROOM_MONITOR</span>
+                  <span>{shadowStage > 0 ? "ANOMALY: BEHIND_SUBJECT" : "SUBJECT: ACTIVE"}</span>
                 </div>
               </div>
             </div>
 
-            {/* Viewfinder Status Footer */}
-            <div className="pt-2 mt-2 border-t border-crt-dim/40 flex items-center justify-between text-[11px] text-crt-dim">
-              <span>FILTER: MONO_P31_PHOSPHOR</span>
-              <span className="text-crt-bright">
-                {shadowStage === 0 ? "ROOM: CLEAR" : "ANOMALY: DETECTED"}
-              </span>
+            {/* Quick Webcam Snapshot Trigger */}
+            <div className="mt-2 flex items-center justify-between">
+              <button
+                onClick={() => setActiveWindows((prev) => ({ ...prev, polaroid: true }))}
+                className="win98-bevel-button px-2 py-1 text-xs text-black font-sans flex items-center gap-1 font-semibold"
+              >
+                <Camera className="w-3.5 h-3.5 text-neutral-800" />
+                Snapshot Polaroid
+              </button>
+              <button
+                onClick={() =>
+                  setWebcamMode((prev) => (prev === "vintage" ? "corrupted" : "vintage"))
+                }
+                className="text-[11px] text-neutral-700 underline font-sans hover:text-black"
+              >
+                Toggle Night Vision
+              </button>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Quick Telemetry & Debug Hotkey Deck */}
-          <div className="border border-crt-dim/40 rounded bg-black/40 p-3 text-xs space-y-2">
-            <div className="text-crt-bright font-semibold text-[11px] flex items-center justify-between">
-              <span>DEMO & DEBUG SHORTCUTS:</span>
-              <span className="text-crt-dim text-[10px]">HOTKEYS [1-4]</span>
+      {/* WINDOW 3: Creepy Notepad (README.txt Lore) */}
+      {readmeOpen && (
+        <div className="fixed top-20 left-12 md:left-24 w-[310px] md:w-[380px] bg-[#c0c0c0] win98-bevel-out shadow-2xl z-40">
+          <div className="win98-titlebar flex items-center justify-between px-2 py-1">
+            <div className="flex items-center gap-1 text-xs text-white">
+              <FileText className="w-3.5 h-3.5" />
+              <span>Notepad - README.txt</span>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <div className="bg-black/50 p-1.5 border border-crt-dim/30 rounded">
-                <span className="text-crt-green font-bold">[1]</span> Glitch Tear
-              </div>
-              <div className="bg-black/50 p-1.5 border border-crt-dim/30 rounded">
-                <span className="text-crt-green font-bold">[2]</span> Cycle Shadow ({shadowStage}/3)
-              </div>
-              <div className="bg-black/50 p-1.5 border border-crt-dim/30 rounded">
-                <span className="text-crt-green font-bold">[3]</span> Toggle Shake ({viewfinderShake ? "ON" : "OFF"})
-              </div>
-              <div className="bg-black/50 p-1.5 border border-crt-dim/30 rounded">
-                <span className="text-crt-green font-bold">[4]</span> Text Drift ({textDriftTrigger ? "ON" : "OFF"})
-              </div>
+            <button
+              onClick={() => setReadmeOpen(false)}
+              className="win98-bevel-button w-4 h-3.5 flex items-center justify-center text-black text-[10px] font-bold"
+            >
+              <X className="w-2.5 h-2.5" />
+            </button>
+          </div>
+          <div className="p-2">
+            <div className="win98-bevel-in bg-white p-3 text-xs font-mono text-neutral-800 h-52 overflow-y-auto leading-relaxed">
+              <p className="font-bold text-red-900 mb-2">DO NOT TURN AROUND.</p>
+              <p className="mb-2">
+                If you are looking at the screen, it cannot move. The moment you look away, check
+                your shoulder, or look behind your chair, it steps closer.
+              </p>
+              <p className="mb-2">
+                Look at the polaroid in your files. It was already in your room before you launched
+                this program.
+              </p>
+              <p className="text-neutral-500 text-[11px]">
+                Last modified: 11:42 PM - Subject #4091 (TERMINATED)
+              </p>
+            </div>
+            <div className="mt-2 flex justify-end">
+              <button
+                onClick={() => setReadmeOpen(false)}
+                className="win98-bevel-button px-3 py-1 text-xs text-black font-semibold"
+              >
+                Close
+              </button>
             </div>
           </div>
-        </section>
+        </div>
+      )}
+
+      {/* WINDOW 4: Windows 98 Critical Exception Error Dialog */}
+      {errorDialogOpen && (
+        <div className="fixed inset-0 z-[8500] flex items-center justify-center bg-black/30">
+          <div className="win98-bevel-out bg-[#c0c0c0] w-[340px] md:w-[420px] p-1 shadow-2xl">
+            <div className="win98-titlebar-corrupted flex items-center justify-between px-2 py-1">
+              <div className="flex items-center gap-1 text-xs text-white">
+                <AlertOctagon className="w-3.5 h-3.5 text-red-400" />
+                <span>POND_OS 99 - CRITICAL EXCEPTION</span>
+              </div>
+              <button
+                onClick={() => setErrorDialogOpen(false)}
+                className="win98-bevel-button w-4 h-3.5 flex items-center justify-center text-black text-[10px] font-bold"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
+            <div className="p-4 flex items-start gap-3">
+              <AlertOctagon className="w-9 h-9 text-red-600 shrink-0" />
+              <div className="text-xs font-sans text-black leading-relaxed">
+                <p className="font-semibold mb-1">Fatal Exception 0E has occurred.</p>
+                <p className="text-neutral-800">{errorMessage}</p>
+                <p className="mt-2 text-[11px] text-neutral-600 font-mono">
+                  * Press any key to continue. It will not help.
+                </p>
+              </div>
+            </div>
+            <div className="p-2 border-t border-neutral-400 flex justify-end gap-2">
+              <button
+                onClick={() => setErrorDialogOpen(false)}
+                className="win98-bevel-button px-3 py-1 text-xs text-black font-semibold"
+              >
+                OK
+              </button>
+              <button
+                onClick={() => setErrorDialogOpen(false)}
+                className="win98-bevel-button px-3 py-1 text-xs text-black"
+              >
+                Ignore
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POLAROID VIEWER POPUP (Live Face Snapshot + Creepy Ghost Behind Shoulder) */}
+      <PolaroidViewer
+        isOpen={activeWindows.polaroid}
+        onClose={() => setActiveWindows((prev) => ({ ...prev, polaroid: false }))}
+        videoRef={videoRef}
+        shadowStage={shadowStage}
+      />
+
+      {/* BOTTOM-RIGHT DEBUG & DEMO SHORTCUTS DOCK */}
+      <div className="fixed bottom-12 right-4 z-20 bg-[#c0c0c0] win98-bevel-out p-2 shadow-lg max-w-[280px]">
+        <div className="text-[11px] font-bold text-neutral-900 border-b border-neutral-400 pb-1 mb-1.5 flex items-center justify-between">
+          <span>DEMO HORROR SHORTCUTS:</span>
+          <span className="text-[10px] text-neutral-600 font-mono">[KEYS 1-6]</span>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono">
+          <div className="bg-white p-1 win98-bevel-in">
+            <span className="font-bold text-blue-900">[1]</span> Glitch & Error
+          </div>
+          <div className="bg-white p-1 win98-bevel-in">
+            <span className="font-bold text-blue-900">[2]</span> Shadow ({shadowStage}/3)
+          </div>
+          <div className="bg-white p-1 win98-bevel-in">
+            <span className="font-bold text-red-900">[3]</span> Face Polaroid
+          </div>
+          <div className="bg-white p-1 win98-bevel-in">
+            <span className="font-bold text-blue-900">[4]</span> Screen Cracks ({screenCracked ? `L${crackSeverity}` : "OFF"})
+          </div>
+          <div className="bg-white p-1 win98-bevel-in">
+            <span className="font-bold text-blue-900">[5]</span> Cam Shake
+          </div>
+          <div className="bg-white p-1 win98-bevel-in">
+            <span className="font-bold text-blue-900">[6]</span> Text Drift
+          </div>
+        </div>
       </div>
 
-      {/* Bottom Status Ticker */}
-      <footer className="mt-4 pt-2 border-t border-crt-dim/40 flex flex-wrap items-center justify-between text-xs text-crt-dim gap-2">
-        <div>
-          <span>DAEMON: STILL_HERE // VERCEL_BUILD: COMPLIANT</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span>AFFECT_ENGINE: READY</span>
-          <span className="text-crt-bright">GEMINI_API: LINKED</span>
-        </div>
-      </footer>
+      {/* WINDOWS 98 BOTTOM TASKBAR */}
+      <WindowsTaskbar
+        activeWindows={activeWindows}
+        onToggleWindow={handleToggleWindow}
+        onEmergencyGlitch={triggerGlitchSpike}
+        shadowStage={shadowStage}
+      />
     </main>
   );
 }

@@ -3,113 +3,143 @@
 @tailwind utilities;
 
 :root {
-  --color-void: #050805;
-  --color-phosphor: #20c20e;
-  --color-bright: #3bf824;
-  --color-dim: #0f5907;
+  --win-bg: #008080; /* Classic Windows 95/98 Teal */
+  --win-gray: #c0c0c0; /* Standard Windows Gray */
+  --win-light: #ffffff;
+  --win-dark: #808080;
+  --win-black: #000000;
+  --win-blue-start: #000080;
+  --win-blue-end: #1084d0;
 }
 
 body {
-  background-color: var(--color-void);
-  color: var(--color-phosphor);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  background-color: var(--win-bg);
+  font-family: "MS Sans Serif", Tahoma, "Segoe UI", sans-serif;
   margin: 0;
   padding: 0;
   overflow: hidden;
   user-select: none;
 }
 
-/* CRT Screen Scanline Overlay */
-.crt-overlay {
+/* Classic Windows 98 3D Bevel Borders */
+.win98-bevel-out {
+  border-top: 2px solid #ffffff;
+  border-left: 2px solid #ffffff;
+  border-right: 2px solid #404040;
+  border-bottom: 2px solid #404040;
+  box-shadow: inset 1px 1px 0px #dfdfdf, inset -1px -1px 0px #808080;
+}
+
+.win98-bevel-in {
+  border-top: 2px solid #404040;
+  border-left: 2px solid #404040;
+  border-right: 2px solid #ffffff;
+  border-bottom: 2px solid #ffffff;
+  box-shadow: inset 1px 1px 0px #808080, inset -1px -1px 0px #dfdfdf;
+}
+
+.win98-bevel-button {
+  background-color: #c0c0c0;
+  border-top: 2px solid #ffffff;
+  border-left: 2px solid #ffffff;
+  border-right: 2px solid #000000;
+  border-bottom: 2px solid #000000;
+  box-shadow: inset 1px 1px 0px #dfdfdf, inset -1px -1px 0px #808080;
+}
+
+.win98-bevel-button:active {
+  border-top: 2px solid #000000;
+  border-left: 2px solid #000000;
+  border-right: 2px solid #ffffff;
+  border-bottom: 2px solid #ffffff;
+  box-shadow: inset 1px 1px 0px #808080, inset -1px -1px 0px #dfdfdf;
+}
+
+/* Windows 98 Active Title Bar */
+.win98-titlebar {
+  background: linear-gradient(90deg, #000080 0%, #1084d0 100%);
+  color: #ffffff;
+  font-weight: bold;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+.win98-titlebar-corrupted {
+  background: linear-gradient(90deg, #600000 0%, #1a0000 100%);
+  color: #ff5555;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+/* Subtle Retro CRT Scanline overlay */
+.retro-crt-lines {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 999;
   background: linear-gradient(
     rgba(18, 16, 16, 0) 50%, 
-    rgba(0, 0, 0, 0.35) 50%
-  ), linear-gradient(
-    90deg,
-    rgba(255, 0, 0, 0.03),
-    rgba(0, 255, 0, 0.01),
-    rgba(0, 0, 255, 0.03)
+    rgba(0, 0, 0, 0.12) 50%
   );
-  background-size: 100% 3px, 6px 100%;
+  background-size: 100% 4px;
 }
 
-/* CRT Vignette / Curved Screen effect */
-.crt-vignette {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 998;
-  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.85), inset 0 0 30px rgba(15, 89, 7, 0.2);
+/* Natural Vintage Webcam Filter (Realistic early 2000s CMOS webcam - toned down green) */
+.webcam-vintage-natural {
+  filter: contrast(1.1) saturate(0.85) brightness(0.95);
 }
 
-/* Monochrome Green Surveillance Camera Filter */
-.surveillance-filter {
-  filter: grayscale(100%) brightness(0.85) sepia(100%) hue-rotate(85deg) saturate(700%) contrast(1.35);
-}
-
-/* Phosphor Glow effect */
-.phosphor-glow {
-  text-shadow: 0 0 5px rgba(32, 194, 14, 0.7), 0 0 12px rgba(32, 194, 14, 0.4);
-}
-
-.phosphor-glow-bright {
-  text-shadow: 0 0 8px rgba(59, 248, 36, 0.9), 0 0 18px rgba(59, 248, 36, 0.6);
+.webcam-corrupted {
+  filter: contrast(1.4) saturate(0.3) brightness(0.65) hue-rotate(330deg);
 }
 
 /* Viewfinder Shaking */
 .viewfinder-shake {
-  animation: cameraJitter 0.12s infinite;
+  animation: cameraJitter 0.1s infinite;
 }
 
 @keyframes cameraJitter {
-  0% { transform: translate(0, 0) scale(1.02); }
-  25% { transform: translate(-2px, 1.5px) scale(1.02); }
-  50% { transform: translate(1.5px, -1px) scale(1.02); }
-  75% { transform: translate(-1px, -1.5px) scale(1.02); }
-  100% { transform: translate(2px, 1px) scale(1.02); }
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-3px, 2px); }
+  50% { transform: translate(2px, -2px); }
+  75% { transform: translate(-2px, -1px); }
+  100% { transform: translate(3px, 1px); }
 }
 
-/* Mid-Sentence Violent Glitch */
+/* Screen Glitch Horizontal Tear */
 .screen-glitch {
   animation: horizontalTear 0.35s steps(2, end) forwards;
 }
 
 @keyframes horizontalTear {
-  0% {
-    clip-path: inset(0 0 0 0);
-    transform: translate(0);
-    filter: invert(0);
-  }
-  15% {
-    clip-path: inset(20% 0 30% 0);
-    transform: translate(-12px, 2px) skewX(4deg);
-    filter: invert(0.8);
-  }
-  35% {
-    clip-path: inset(55% 0 10% 0);
-    transform: translate(14px, -3px) skewX(-4deg);
-  }
-  55% {
-    clip-path: inset(10% 0 65% 0);
-    transform: translate(-8px, 4px);
-    filter: invert(0.4);
-  }
-  75% {
-    clip-path: inset(40% 0 25% 0);
-    transform: translate(6px, -2px) skewX(2deg);
-  }
-  100% {
-    clip-path: inset(0 0 0 0);
-    transform: translate(0);
-    filter: invert(0);
+  0% { transform: translate(0); filter: invert(0); }
+  20% { transform: translate(-10px, 3px) skewX(3deg); filter: invert(0.8); }
+  40% { transform: translate(12px, -2px) skewX(-3deg); filter: contrast(2); }
+  60% { transform: translate(-6px, 2px); filter: invert(0.3); }
+  80% { transform: translate(4px, -1px); }
+  100% { transform: translate(0); filter: invert(0); }
+}
+
+/* Polaroid Paper Texture & Shadow */
+.polaroid-frame {
+  background-color: #f7f5ed;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8), 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Glass Shatter Crack Line Animations */
+.crack-line {
+  stroke-dasharray: 600;
+  stroke-dashoffset: 600;
+  animation: crackSpread 0.4s ease-out forwards;
+}
+
+@keyframes crackSpread {
+  to {
+    stroke-dashoffset: 0;
   }
 }
 
-/* Text Drift / Falling Effect for Nervous Laughter / High Paranoia */
+/* Text Drift / Corrupted falling text */
 .text-drift-fall {
   display: inline-block;
   animation: letterDrop 3.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
@@ -122,17 +152,7 @@ body {
   100% { transform: translateY(45px) rotate(12deg); opacity: 0.2; }
 }
 
-/* Scrollbar Customization */
-::-webkit-scrollbar {
-  width: 5px;
-}
-::-webkit-scrollbar-track {
-  background: #050805;
-}
-::-webkit-scrollbar-thumb {
-  background: #0f5907;
-  border-radius: 2px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #20c20e;
+/* Pixel font / Sans serif fallback */
+.font-win98 {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
