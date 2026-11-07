@@ -7,19 +7,20 @@ import { FaceTelemetry } from "@/utils/telemetry";
 interface TelemetryHUDProps {
   telemetry: FaceTelemetry;
   isModelReady: boolean;
-  shadowStage: number;
+  clownStage: "none" | "standing_far" | "near_unsmiling" | "jumpscare_smiling";
 }
 
 export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
   telemetry,
   isModelReady,
-  shadowStage,
+  clownStage,
 }) => {
   const isLookingAway = telemetry.isHeadTurned;
+  const isLookingAtViewfinder = telemetry.gazeAtViewfinder;
 
   return (
     <div className="win98-bevel-in bg-black/90 p-2 text-xs font-mono text-emerald-400 border border-neutral-700 shadow-inner flex flex-wrap items-center justify-between gap-3 select-none">
-      {/* MediaPipe Connection Status */}
+      {/* MediaPipe Status */}
       <div className="flex items-center gap-2">
         <Activity
           className={`w-3.5 h-3.5 ${
@@ -29,15 +30,15 @@ export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
         <span className="text-[11px] text-neutral-300">
           AFFECT_CORE:{" "}
           <strong className={isModelReady ? "text-emerald-400" : "text-amber-400"}>
-            {isModelReady ? "ONLINE (30 FPS)" : "INITIALIZING..."}
+            {isModelReady ? "ONLINE (30 FPS)" : "CALIBRATING..."}
           </strong>
         </span>
       </div>
 
-      {/* Head Yaw & Angle Tracker */}
+      {/* Head Yaw */}
       <div className="flex items-center gap-1.5 text-[11px]">
         <Compass className="w-3.5 h-3.5 text-blue-400" />
-        <span className="text-neutral-400">YAW:</span>
+        <span className="text-neutral-400">HEAD_YAW:</span>
         <span
           className={`font-bold ${
             isLookingAway ? "text-red-400 animate-pulse" : "text-neutral-100"
@@ -48,59 +49,39 @@ export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
         </span>
       </div>
 
-      {/* Gaze Lock Indicator */}
+      {/* Eye Gaze Target */}
       <div className="flex items-center gap-1.5 text-[11px]">
         <Eye className="w-3.5 h-3.5 text-amber-400" />
-        <span className="text-neutral-400">GAZE:</span>
+        <span className="text-neutral-400">GAZE_TRACK:</span>
         <span
           className={`font-bold ${
-            telemetry.gazeLocked ? "text-emerald-400" : "text-amber-400"
+            isLookingAtViewfinder
+              ? "text-red-400 animate-pulse font-extrabold"
+              : telemetry.gazeLocked
+              ? "text-emerald-400"
+              : "text-amber-300"
           }`}
         >
-          {telemetry.gazeLocked ? "LOCKED (READING)" : "DRIFTING"}
+          {isLookingAtViewfinder
+            ? "⚠ VIEWING CAM (DANGER!)"
+            : telemetry.gazeLocked
+            ? "READING CHAT"
+            : "LOOKING AROUND"}
         </span>
       </div>
 
-      {/* Valence / Arousal Stress Metric */}
-      <div className="flex items-center gap-2 text-[11px]">
-        <span className="text-neutral-400">
-          VALENCE:{" "}
-          <strong
-            className={
-              telemetry.valence < -0.2
-                ? "text-red-400"
-                : telemetry.valence > 0.3
-                ? "text-amber-300"
-                : "text-neutral-200"
-            }
-          >
-            {telemetry.valence}
-          </strong>
-        </span>
-        <span className="text-neutral-400">
-          AROUSAL:{" "}
-          <strong
-            className={
-              telemetry.arousal > 0.5 ? "text-red-400 font-bold" : "text-neutral-200"
-            }
-          >
-            {telemetry.arousal}
-          </strong>
-        </span>
-      </div>
-
-      {/* Threat / Shadow Level */}
+      {/* Entity Stage */}
       <div className="flex items-center gap-1.5 text-[11px]">
         <ShieldAlert className="w-3.5 h-3.5 text-red-500" />
-        <span className="text-neutral-400">ENTITY_PROXIMITY:</span>
+        <span className="text-neutral-400">ROOM_ANOMALY:</span>
         <span className="text-red-400 font-bold">
-          {shadowStage === 0
-            ? "CLEAR"
-            : shadowStage === 1
-            ? "FAR CORNER"
-            : shadowStage === 2
-            ? "BEHIND CHAIR"
-            : "LOOMING SHOULDER"}
+          {clownStage === "none"
+            ? "CLEAR (0/3)"
+            : clownStage === "standing_far"
+            ? "FAR CORNER (1/3)"
+            : clownStage === "near_unsmiling"
+            ? "BEHIND CHAIR (2/3)"
+            : "JUMPSCARE (3/3)"}
         </span>
       </div>
     </div>

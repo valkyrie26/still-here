@@ -1,18 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FaceTelemetry, computeAffectFromBlendshapes } from "@/utils/telemetry";
 
 interface UseFaceTelemetryOptions {
   videoRef: React.RefObject<HTMLVideoElement>;
   enabled?: boolean;
   onHeadTurn?: (yaw: number) => void;
+  onViewfinderGaze?: () => void;
 }
 
 export function useFaceTelemetry({
   videoRef,
   enabled = true,
   onHeadTurn,
+  onViewfinderGaze,
 }: UseFaceTelemetryOptions) {
   const [telemetry, setTelemetry] = useState<FaceTelemetry>({
     valence: 0,
@@ -21,6 +23,7 @@ export function useFaceTelemetry({
     eyeWide: 0.2,
     headYaw: 0,
     gazeLocked: true,
+    gazeAtViewfinder: false,
     isHeadTurned: false,
     timeInSession: 0,
   });
@@ -30,11 +33,15 @@ export function useFaceTelemetry({
   const requestRef = useRef<number | null>(null);
   const sessionStartTime = useRef<number>(Date.now());
   const lastHeadTurnTriggerTime = useRef<number>(0);
+  const lastViewfinderGazeTriggerTime = useRef<number>(0);
+
   const onHeadTurnRef = useRef(onHeadTurn);
+  const onViewfinderGazeRef = useRef(onViewfinderGaze);
 
   useEffect(() => {
     onHeadTurnRef.current = onHeadTurn;
-  }, [onHeadTurn]);
+    onViewfinderGazeRef.current = onViewfinderGaze;
+  }, [onHeadTurn, onViewfinderGaze]);
 
   // Load MediaPipe FaceLandmarker
   useEffect(() => {
@@ -71,7 +78,7 @@ export function useFaceTelemetry({
           setIsModelReady(true);
         }
       } catch (err) {
-        console.warn("MediaPipe model loading warning (using fallback):", err);
+        console.warn("MediaPipe model loading warning:", err);
       }
     }
 
@@ -124,10 +131,10 @@ export function useFaceTelemetry({
 
               setTelemetry(currentTelemetry);
 
-              // Edge Trigger on Head Turn (|headYaw| > 18 deg)
+              const now = Date.now();
+
+              // Trigger 1: Head Turn (|headYaw| > 18 deg)
               if (currentTelemetry.isHeadTurned) {
-                const now = Date.now();
-                // Throttle triggers to avoid spamming (once every 1.5s)
                 if (now - lastHeadTurnTriggerTime.current > 1500) {
                   lastHeadTurnTriggerTime.current = now;
                   if (onHeadTurnRef.current) {
@@ -135,8 +142,17 @@ export function useFaceTelemetry({
                   }
                 }
               }
+
+              // Trigger 2: Direct Gaze at Viewfinder / Clown
+              if (currentTelemetry.gazeAtViewfinder) {
+                if (now - lastViewfinderGazeTriggerTime.current > 2500) {
+                  lastViewfinderGazeTriggerTime.current = now;
+                  if (onViewfinderGazeRef.current) {
+                    onViewfinderGazeRef.current();
+                  }
+                }
+              }
             } else {
-              // Face temporarily not visible in frame
               setTelemetry((prev) => ({
                 ...prev,
                 timeInSession: sessionElapsed,

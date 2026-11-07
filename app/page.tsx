@@ -11,19 +11,19 @@ import {
   Eye,
   Camera,
   FileText,
-  Activity,
 } from "lucide-react";
 import { WindowsTaskbar } from "@/components/WindowsTaskbar";
 import { DesktopIcons } from "@/components/DesktopIcons";
 import { PolaroidViewer } from "@/components/PolaroidViewer";
 import { ScreenCrack } from "@/components/ScreenCrack";
-import { GhostFigure } from "@/components/GhostFigure";
+import { ClownEntity, ClownStage } from "@/components/ClownEntity";
 import { TelemetryHUD } from "@/components/TelemetryHUD";
 import { useFaceTelemetry } from "@/hooks/useFaceTelemetry";
+import { soundEngine } from "@/utils/sound";
 
 interface ChatMessage {
   id: string;
-  sender: "pond" | "user" | "system";
+  sender: "pond" | "user" | "system" | "unknown";
   text: string;
   isDrifting?: boolean;
 }
@@ -34,7 +34,6 @@ export default function Home() {
     chat: true,
     viewfinder: true,
     polaroid: false,
-    hud: true,
   });
 
   // Dialog & Horror Popups
@@ -44,19 +43,22 @@ export default function Home() {
     "FATAL EXCEPTION 0E : An unknown presence was detected in your physical space."
   );
 
-  // Paranoia & Horror States
+  // Clown Entity Stage: "none" | "standing_far" | "near_unsmiling" | "jumpscare_smiling"
+  const [clownStage, setClownStage] = useState<ClownStage>("none");
+
+  // Psychological Story Arc Step
+  // 0: Calibration/Casual -> 1: Far Clown Spawn -> 2: Turned & Vanished -> 3: Cutoff & Glitch -> 4: Reconnected -> 5: Creeping Near -> 6: Jumpscare
+  const [storyStep, setStoryStep] = useState<number>(0);
+
+  // Paranoia & FX States
   const [glitchActive, setGlitchActive] = useState(false);
   const [viewfinderShake, setViewfinderShake] = useState(false);
-  const [viewfinderDim, setViewfinderDim] = useState(0); // 0 to -0.6
-  const [shadowStage, setShadowStage] = useState<number>(1); // Default to stage 1 to see the ghostly figure!
+  const [viewfinderDim, setViewfinderDim] = useState(0);
   const [screenCracked, setScreenCracked] = useState(false);
   const [crackSeverity, setCrackSeverity] = useState<1 | 2 | 3>(1);
   const [textDriftTrigger, setTextDriftTrigger] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [webcamMode, setWebcamMode] = useState<"vintage" | "corrupted">("vintage");
-
-  // Gaze Trap State
-  const [trapArmed, setTrapArmed] = useState(false);
 
   // Chat Feed State
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -68,55 +70,132 @@ export default function Home() {
     {
       id: "pond-init",
       sender: "pond",
-      text: "hello. can you see me clearly?",
+      text: "hey! can you hear me alright?",
     },
   ]);
   const [inputText, setInputText] = useState("");
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
+  const typingAudioPitch = useRef<number>(1.0);
 
-  // Trigger Glitch & Horror Tear
+  // Typewriter character sound effect
+  const playTypewriterForText = useCallback((text: string) => {
+    let index = 0;
+    const interval = setInterval(() => {
+      soundEngine.playKeystroke(typingAudioPitch.current);
+      index++;
+      if (index >= text.length) {
+        clearInterval(interval);
+      }
+    }, 45);
+  }, []);
+
+  // Trigger violent screen glitch
   const triggerGlitchSpike = useCallback(() => {
     setGlitchActive(true);
+    soundEngine.playGlitchSting();
     setTimeout(() => setGlitchActive(false), 380);
   }, []);
 
-  // HEAD TURN EVENT: Triggered when player turns head (|headYaw| > 18°)
-  const handleHeadTurn = useCallback(
-    (yaw: number) => {
-      // 1. Violent Glitch Tear
-      triggerGlitchSpike();
+  // JUMPSCARE TRIGGER
+  const triggerJumpscare = useCallback(() => {
+    setClownStage("jumpscare_smiling");
+    soundEngine.playJumpscareSting();
+    setScreenCracked(true);
+    setCrackSeverity(3);
+    setViewfinderShake(true);
 
-      // 2. Camera Jitter
-      setViewfinderShake(true);
-      setTimeout(() => setViewfinderShake(false), 1200);
+    setTimeout(() => {
+      setClownStage("none");
+      setViewfinderShake(false);
+      setErrorMessage("FATAL EXCEPTION 0E : IT IS RIGHT BEHIND YOU.");
+      setErrorDialogOpen(true);
+    }, 1100);
+  }, []);
 
-      // 3. Screen Glass Fracture
-      setScreenCracked(true);
-      setCrackSeverity((prev) => (prev === 3 ? 3 : ((prev + 1) as 1 | 2 | 3)));
+  // HEAD-TURN DETECTED (|headYaw| > 18 deg)
+  const handleHeadTurn = useCallback(() => {
+    // If the clown was standing in the far corner, turning around causes it to DISAPPEAR!
+    if (clownStage === "standing_far") {
+      setClownStage("none"); // It vanishes!
+      setStoryStep(2);
 
-      // 4. Ghost jumps closer behind shoulder
-      setShadowStage((prev) => Math.min(3, prev + 1));
+      // Mid-sentence cutoff sequence
+      setTimeout(() => {
+        soundEngine.stopAllSound();
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `pond-cutoff-${Date.now()}`,
+            sender: "pond",
+            text: "wait... it's gone? i swear i saw—",
+          },
+        ]);
 
-      // 5. Mid-Sentence Cutoff / Interruption in chat
+        // Glitch & Simulated Disconnect
+        triggerGlitchSpike();
+        setScreenCracked(true);
+        setCrackSeverity(1);
+
+        setTimeout(() => {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `sys-dc-${Date.now()}`,
+              sender: "system",
+              text: "CONNECTION LOST... ATTEMPTING RECONNECT...",
+            },
+          ]);
+
+          // Reconnect casually after 3 seconds
+          setTimeout(() => {
+            typingAudioPitch.current = 0.75;
+            soundEngine.startAmbientDrone();
+            setStoryStep(4);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `pond-reconnect-${Date.now()}`,
+                sender: "pond",
+                text: "sorry about that. glitch in the line. what were we talking about?",
+              },
+            ]);
+            playTypewriterForText("sorry about that. glitch in the line. what were we talking about?");
+          }, 3000);
+        }, 1200);
+      }, 700);
+    }
+  }, [clownStage, triggerGlitchSpike, playTypewriterForText]);
+
+  // GAZE AT VIEWFINDER DETECTED (Player looks directly at the clown window!)
+  const handleViewfinderGaze = useCallback(() => {
+    // If the clown is near behind the chair and player looks right at it:
+    if (clownStage === "near_unsmiling") {
+      // 1. Intruder message from "unknown"
       setMessages((prev) => [
         ...prev,
         {
-          id: `pond-cutoff-${Date.now()}`,
-          sender: "pond",
-          text: "i swear i saw—",
+          id: `unknown-${Date.now()}`,
+          sender: "unknown",
+          text: "you smell nice.",
         },
       ]);
-    },
-    [triggerGlitchSpike]
-  );
+      soundEngine.stopAllSound();
+
+      // 2. Jumpscare after brief dread pause
+      setTimeout(() => {
+        triggerJumpscare();
+      }, 900);
+    }
+  }, [clownStage, triggerJumpscare]);
 
   // MediaPipe Vision Telemetry Hook
   const { telemetry, isModelReady } = useFaceTelemetry({
     videoRef,
     enabled: true,
     onHeadTurn: handleHeadTurn,
+    onViewfinderGaze: handleViewfinderGaze,
   });
 
   // Initialize Webcam (Natural early 2000s CMOS styling)
@@ -167,8 +246,16 @@ export default function Home() {
         triggerGlitchSpike();
         setErrorDialogOpen(true);
       } else if (e.key === "2") {
-        // Cycle Ghost figure behind shoulder (0 to 3)
-        setShadowStage((prev) => (prev + 1) % 4);
+        // Cycle Clown Stage manually for testing
+        setClownStage((prev) =>
+          prev === "none"
+            ? "standing_far"
+            : prev === "standing_far"
+            ? "near_unsmiling"
+            : prev === "near_unsmiling"
+            ? "jumpscare_smiling"
+            : "none"
+        );
       } else if (e.key === "3") {
         // Open live creepy face Polaroid
         setActiveWindows((prev) => ({ ...prev, polaroid: true }));
@@ -177,55 +264,97 @@ export default function Home() {
         setScreenCracked((prev) => !prev);
         setCrackSeverity((prev) => (prev === 3 ? 1 : ((prev + 1) as 1 | 2 | 3)));
       } else if (e.key === "5") {
-        // Toggle camera shake
-        setViewfinderShake((prev) => !prev);
+        // Trigger Gaze Trap & Jumpscare manually
+        handleViewfinderGaze();
       } else if (e.key === "6") {
-        // Toggle text falling
-        setTextDriftTrigger((prev) => !prev);
+        // Reset Story Arc to Start
+        setClownStage("none");
+        setStoryStep(0);
+        setScreenCracked(false);
+        typingAudioPitch.current = 1.0;
+        setMessages([
+          {
+            id: "sys-0",
+            sender: "system",
+            text: "POND_OS 99 [SESSION RESET] // SYSTEM NORMAL",
+          },
+          {
+            id: "pond-init",
+            sender: "pond",
+            text: "hey! can you hear me alright?",
+          },
+        ]);
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [triggerGlitchSpike]);
+  }, [triggerGlitchSpike, handleViewfinderGaze]);
 
+  // User sends message in POND Messenger
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
 
+    const userText = inputText.trim();
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       sender: "user",
-      text: inputText.trim(),
+      text: userText,
     };
 
     setMessages((prev) => [...prev, userMsg]);
     setInputText("");
 
-    // Simulated conversational escalation and Gaze Trap Arming
+    // Psychological Narrative Script progression based on storyStep:
     setTimeout(() => {
-      if (messages.length <= 3) {
+      if (storyStep === 0) {
+        // Calibration 1 -> ask if in room
+        const reply = "cool. thanks for hopping on. are you in your room right now?";
         setMessages((prev) => [
           ...prev,
-          {
-            id: `pond-${Date.now()}`,
-            sender: "pond",
-            text: "don't turn around.",
-          },
+          { id: `pond-${Date.now()}`, sender: "pond", text: reply },
         ]);
-        setTrapArmed(true);
-      } else if (messages.length <= 5) {
+        playTypewriterForText(reply);
+        setStoryStep(1);
+      } else if (storyStep === 1) {
+        // Calibration 2 -> trigger the far clown standing
+        const reply = "wait... who's behind you?";
         setMessages((prev) => [
           ...prev,
-          {
-            id: `pond-${Date.now()}`,
-            sender: "pond",
-            text: "in the corner. i saw someone standing there.",
-          },
+          { id: `pond-${Date.now()}`, sender: "pond", text: reply },
         ]);
-        setShadowStage(2);
+        playTypewriterForText(reply);
+
+        // Spawn Clown far away in the back corner!
+        setTimeout(() => {
+          setClownStage("standing_far");
+        }, 800);
+      } else if (storyStep === 4) {
+        // Reconnected -> noticing subtle wrong details
+        const reply = "your door was closed earlier, right?";
+        setMessages((prev) => [
+          ...prev,
+          { id: `pond-${Date.now()}`, sender: "pond", text: reply },
+        ]);
+        playTypewriterForText(reply);
+        setStoryStep(5);
+      } else if (storyStep === 5) {
+        // Creeping near & warn not to look
+        const reply = "do not look at your viewfinder. it only moves when you look.";
+        setMessages((prev) => [
+          ...prev,
+          { id: `pond-${Date.now()}`, sender: "pond", text: reply },
+        ]);
+        playTypewriterForText(reply);
+
+        // Reappear closer behind chair!
+        setTimeout(() => {
+          setClownStage("near_unsmiling");
+          setViewfinderDim(-0.25);
+        }, 1200);
       }
-    }, 1200);
+    }, 1100);
   };
 
   return (
@@ -240,6 +369,9 @@ export default function Home() {
       {/* Screen Crack Glass Shatter Overlay */}
       <ScreenCrack active={screenCracked} severity={crackSeverity} />
 
+      {/* Fullscreen Smiling Clown Jumpscare */}
+      <ClownEntity stage={clownStage === "jumpscare_smiling" ? "jumpscare_smiling" : "none"} />
+
       {/* Virtual Desktop Icons */}
       <DesktopIcons
         onOpenPolaroid={() => setActiveWindows((prev) => ({ ...prev, polaroid: true }))}
@@ -248,7 +380,7 @@ export default function Home() {
           setErrorMessage("SYSTEM ANOMALY: Access denied. Unauthorized observer detected.");
           setErrorDialogOpen(true);
         }}
-        anomaliesDiscovered={shadowStage}
+        anomaliesDiscovered={clownStage === "none" ? 0 : 1}
       />
 
       {/* TOP DOCKED: Real-Time Affect & Head-Turn Telemetry HUD */}
@@ -256,7 +388,7 @@ export default function Home() {
         <TelemetryHUD
           telemetry={telemetry}
           isModelReady={isModelReady}
-          shadowStage={shadowStage}
+          clownStage={clownStage}
         />
       </div>
 
@@ -264,20 +396,22 @@ export default function Home() {
       {activeWindows.chat && (
         <div
           className={`absolute top-14 left-28 md:left-36 w-[340px] md:w-[480px] bg-[#c0c0c0] win98-bevel-out shadow-2xl z-30 transition-all ${
-            shadowStage >= 2 ? "border-red-900" : ""
+            clownStage === "near_unsmiling" ? "border-red-900" : ""
           }`}
           style={{ maxHeight: "calc(100vh - 120px)" }}
         >
           {/* Title Bar */}
           <div
             className={`flex items-center justify-between px-2 py-1 select-none ${
-              shadowStage >= 2 ? "win98-titlebar-corrupted" : "win98-titlebar"
+              clownStage === "near_unsmiling" ? "win98-titlebar-corrupted" : "win98-titlebar"
             }`}
           >
             <div className="flex items-center gap-1.5 text-xs text-white">
               <MessageSquare className="w-3.5 h-3.5" />
               <span>
-                {shadowStage >= 2 ? "POND_OS // WHO_IS_THERE?" : "POND Instant Messenger v3.1"}
+                {clownStage === "near_unsmiling"
+                  ? "POND_OS // UNKNOWN_OBSERVER_PRESENT"
+                  : "POND Instant Messenger v3.1"}
               </span>
             </div>
             <div className="flex items-center gap-1">
@@ -321,6 +455,8 @@ export default function Home() {
                   className={`leading-relaxed ${
                     msg.sender === "user"
                       ? "text-blue-900"
+                      : msg.sender === "unknown"
+                      ? "text-red-600 font-extrabold tracking-widest animate-pulse"
                       : msg.sender === "pond"
                       ? "text-neutral-900 font-medium"
                       : "text-neutral-500 italic text-[11px]"
@@ -329,6 +465,8 @@ export default function Home() {
                   <span className="font-bold mr-1.5">
                     {msg.sender === "user"
                       ? "[YOU]:"
+                      : msg.sender === "unknown"
+                      ? "[UNKNOWN]:"
                       : msg.sender === "pond"
                       ? "[POND]:"
                       : "[SYSTEM]:"}
@@ -345,7 +483,7 @@ export default function Home() {
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder={trapArmed ? "don't turn around..." : "type your response..."}
+                placeholder="type your response..."
                 className="flex-1 win98-bevel-in px-2 py-1 text-xs font-mono bg-white outline-none"
                 autoFocus
               />
@@ -360,12 +498,18 @@ export default function Home() {
         </div>
       )}
 
-      {/* WINDOW 2: Video Call Viewfinder Window with Spooky Ghost Figure */}
+      {/* WINDOW 2: Video Call Viewfinder Window with Player's Clown Entity */}
       {activeWindows.viewfinder && (
         <div
           className={`absolute top-14 right-4 md:right-8 w-[320px] md:w-[380px] bg-[#c0c0c0] win98-bevel-out shadow-2xl z-20 ${
             viewfinderShake ? "viewfinder-shake" : ""
           }`}
+          onMouseEnter={() => {
+            // Mouse hover also triggers gaze detection if near clown
+            if (clownStage === "near_unsmiling") {
+              handleViewfinderGaze();
+            }
+          }}
         >
           {/* Title Bar */}
           <div className="win98-titlebar flex items-center justify-between px-2 py-1 select-none">
@@ -429,8 +573,8 @@ export default function Home() {
                 style={{ opacity: Math.abs(viewfinderDim) }}
               />
 
-              {/* EERIE SPECTRAL GHOST FIGURE IN YOUR ROOM BEHIND YOUR SHOULDER */}
-              <GhostFigure stage={shadowStage} />
+              {/* CLOWN ENTITY IN VIEWFINDER: standing far or creeping near behind chair */}
+              {clownStage !== "jumpscare_smiling" && <ClownEntity stage={clownStage} />}
 
               {/* Retro Viewfinder Grid Lines */}
               <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-2 text-[10px] font-mono text-white/40">
@@ -440,8 +584,12 @@ export default function Home() {
                 </div>
                 <div className="flex justify-between items-end">
                   <span className="text-[9px] text-white/60">CH-01_ROOM_MONITOR</span>
-                  <span className={shadowStage > 0 ? "text-red-300 font-bold" : "text-white/60"}>
-                    {shadowStage > 0 ? "SPECTRAL ANOMALY: BEHIND YOU" : "SUBJECT: ACTIVE"}
+                  <span className={clownStage !== "none" ? "text-red-300 font-bold" : "text-white/60"}>
+                    {clownStage === "standing_far"
+                      ? "ENTITY: FAR CORNER"
+                      : clownStage === "near_unsmiling"
+                      ? "⚠ ENTITY: BEHIND CHAIR"
+                      : "SUBJECT: ACTIVE"}
                   </span>
                 </div>
               </div>
@@ -486,14 +634,13 @@ export default function Home() {
           </div>
           <div className="p-2">
             <div className="win98-bevel-in bg-white p-3 text-xs font-mono text-neutral-800 h-52 overflow-y-auto leading-relaxed">
-              <p className="font-bold text-red-900 mb-2">DO NOT TURN AROUND.</p>
+              <p className="font-bold text-red-900 mb-2">DO NOT LOOK DIRECTLY AT IT.</p>
               <p className="mb-2">
-                If you are looking at the screen, it cannot move. The moment you look away, check
-                your shoulder, or look behind your chair, it steps closer.
+                If you look at the chat, it stays still. The moment you glance at it in your
+                viewfinder or turn your head to check your room, it takes another step forward.
               </p>
               <p className="mb-2">
-                Look at the polaroid in your files. It was already in your room before you launched
-                this program.
+                If it whispers to you in the chat, do not look into the camera.
               </p>
               <p className="text-neutral-500 text-[11px]">
                 Last modified: 11:42 PM - Subject #4091 (TERMINATED)
@@ -513,7 +660,7 @@ export default function Home() {
 
       {/* WINDOW 4: Windows 98 Critical Exception Error Dialog */}
       {errorDialogOpen && (
-        <div className="fixed inset-0 z-[8500] flex items-center justify-center bg-black/30">
+        <div className="fixed inset-0 z-[8500] flex items-center justify-center bg-black/40">
           <div className="win98-bevel-out bg-[#c0c0c0] w-[340px] md:w-[420px] p-1 shadow-2xl">
             <div className="win98-titlebar-corrupted flex items-center justify-between px-2 py-1">
               <div className="flex items-center gap-1 text-xs text-white">
@@ -555,12 +702,12 @@ export default function Home() {
         </div>
       )}
 
-      {/* POLAROID VIEWER POPUP (Live Face Snapshot + Creepy Ghost Behind Shoulder) */}
+      {/* POLAROID VIEWER POPUP (Live Face Snapshot) */}
       <PolaroidViewer
         isOpen={activeWindows.polaroid}
         onClose={() => setActiveWindows((prev) => ({ ...prev, polaroid: false }))}
         videoRef={videoRef}
-        shadowStage={shadowStage}
+        shadowStage={clownStage === "none" ? 0 : clownStage === "standing_far" ? 1 : 2}
       />
 
       {/* BOTTOM-RIGHT DEBUG & DEMO SHORTCUTS DOCK */}
@@ -574,7 +721,7 @@ export default function Home() {
             <span className="font-bold text-blue-900">[1]</span> Glitch & Error
           </div>
           <div className="bg-white p-1 win98-bevel-in">
-            <span className="font-bold text-blue-900">[2]</span> Ghost ({shadowStage}/3)
+            <span className="font-bold text-blue-900">[2]</span> Clown ({clownStage})
           </div>
           <div className="bg-white p-1 win98-bevel-in">
             <span className="font-bold text-red-900">[3]</span> Face Polaroid
@@ -583,10 +730,10 @@ export default function Home() {
             <span className="font-bold text-blue-900">[4]</span> Screen Cracks ({screenCracked ? `L${crackSeverity}` : "OFF"})
           </div>
           <div className="bg-white p-1 win98-bevel-in">
-            <span className="font-bold text-blue-900">[5]</span> Cam Shake
+            <span className="font-bold text-red-900">[5]</span> Gaze Trap Scare
           </div>
           <div className="bg-white p-1 win98-bevel-in">
-            <span className="font-bold text-blue-900">[6]</span> Text Drift
+            <span className="font-bold text-blue-900">[6]</span> Reset Arc
           </div>
         </div>
       </div>
@@ -596,7 +743,7 @@ export default function Home() {
         activeWindows={activeWindows}
         onToggleWindow={handleToggleWindow}
         onEmergencyGlitch={triggerGlitchSpike}
-        shadowStage={shadowStage}
+        shadowStage={clownStage === "none" ? 0 : 2}
       />
     </main>
   );

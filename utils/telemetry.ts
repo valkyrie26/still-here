@@ -7,8 +7,9 @@ export interface FaceTelemetry {
   smile: number; // 0 to 1
   eyeWide: number; // 0 to 1
   headYaw: number; // degrees: negative = looking left, positive = looking right
-  gazeLocked: boolean; // true when user is actively reading screen
-  isHeadTurned: boolean; // true when |headYaw| > 18°
+  gazeLocked: boolean; // true when user is facing center reading text
+  gazeAtViewfinder: boolean; // true when user shifts eyes/head directly toward the top-right camera window
+  isHeadTurned: boolean; // true when |headYaw| > 18° (turned around)
   timeInSession: number; // seconds since connection
 }
 
@@ -21,7 +22,6 @@ export function computeAffectFromBlendshapes(
   landmarks: { x: number; y: number; z: number }[],
   timeInSession: number
 ): FaceTelemetry {
-  // Map blendshape categories to rapid lookup
   const scores: Record<string, number> = {};
   for (const b of blendshapes) {
     scores[b.categoryName] = b.score;
@@ -29,7 +29,7 @@ export function computeAffectFromBlendshapes(
 
   const get = (name: string) => scores[name] || 0;
 
-  // 1. Positive cues: smiles and cheek squints
+  // 1. Positive cues
   const posCues =
     (get("mouthSmileLeft") +
       get("mouthSmileRight") +
@@ -37,7 +37,7 @@ export function computeAffectFromBlendshapes(
       get("cheekSquintRight")) /
     2;
 
-  // 2. Negative cues: brow furrow, frown, nose sneer
+  // 2. Negative cues
   const negCues =
     (get("browDownLeft") +
       get("browDownRight") +
@@ -47,10 +47,9 @@ export function computeAffectFromBlendshapes(
       get("noseSneerRight")) /
     3;
 
-  // Valence: clamped between -1.0 and 1.0
   const valence = Math.max(-1, Math.min(1, posCues - negCues));
 
-  // Arousal: weighted sum of eye widening, jaw opening, and inner brow raising
+  // Arousal
   const eyeWideLeft = get("eyeWideLeft");
   const eyeWideRight = get("eyeWideRight");
   const jawOpen = get("jawOpen");
@@ -72,10 +71,7 @@ export function computeAffectFromBlendshapes(
   const smile = Math.max(0, Math.min(1, (get("mouthSmileLeft") + get("mouthSmileRight")) / 2));
   const eyeWide = Math.max(0, Math.min(1, (eyeWideLeft + eyeWideRight) / 2));
 
-  // 3. Compute Head Yaw (degrees) from 3D landmarks
-  // Landmark 1: Nose tip
-  // Landmark 234: Left tragus / cheek edge
-  // Landmark 454: Right tragus / cheek edge
+  // Compute Head Yaw (degrees)
   let headYaw = 0;
   if (landmarks && landmarks.length > 454) {
     const nose = landmarks[1];
@@ -87,17 +83,20 @@ export function computeAffectFromBlendshapes(
     const totalDist = distToLeft + distToRight;
 
     if (totalDist > 0.001) {
-      // ratio of 0.5 is facing straight ahead. Range 0.2 to 0.8
       const ratio = distToLeft / totalDist;
-      // Convert to degrees: 0.5 -> 0 deg, 0.2 -> -35 deg, 0.8 -> +35 deg
       headYaw = (ratio - 0.5) * 110;
     }
   }
 
-  // Gaze Locked: user is facing front within +-12 degrees
-  const gazeLocked = Math.abs(headYaw) <= 12;
+  // Gaze Locked (reading central chat)
+  const gazeLocked = Math.abs(headYaw) <= 6;
 
-  // Head Turned: user turns their head past 18 degrees to look around or behind
+  // Gaze at Viewfinder: Head slightly angled towards top-right (between +6° and +17°) or eye look right
+  const eyeLookOutRight = get("eyeLookOutRight") || get("eyeLookInLeft");
+  const gazeAtViewfinder =
+    (headYaw >= 5 && headYaw <= 17) || (headYaw >= 3 && eyeLookOutRight > 0.3);
+
+  // Head Turned Around (|headYaw| > 18 deg)
   const isHeadTurned = Math.abs(headYaw) > 18;
 
   return {
@@ -107,6 +106,7 @@ export function computeAffectFromBlendshapes(
     eyeWide: parseFloat(eyeWide.toFixed(2)),
     headYaw: parseFloat(headYaw.toFixed(1)),
     gazeLocked,
+    gazeAtViewfinder,
     isHeadTurned,
     timeInSession,
   };
