@@ -609,9 +609,7 @@ export default function Home() {
 
               {/* CLOWN ENTITY IN VIEWFINDER: positioned smartly in background based on surroundings */}
               {clownStage !== "jumpscare_smiling" && (
-                <div className="relative z-[6]">
-                  <ClownEntity stage={clownStage} faceBox={telemetry.faceBox} />
-                </div>
+                <ClownEntity stage={clownStage} faceBox={telemetry.faceBox} />
               )}
 
               {/* Retro Viewfinder Grid Lines */}

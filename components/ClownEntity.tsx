@@ -13,37 +13,32 @@ interface ClownEntityProps {
 /**
  * ClownEntity Component
  * Places the player's custom clown entity in the room video feed:
- * 1. "standing_far": Stands far away in the open corner of the room, scaled small with room shadows.
- * 2. "near_unsmiling": Lurking directly behind the chair/shoulder, avoiding face overlap.
+ * 1. "standing_far": Stands far away in the open corner of the room (clear, unmistakable, scaled to distance).
+ * 2. "near_unsmiling": Lurking directly behind the chair/shoulder.
  * 3. "jumpscare_smiling": Fullscreen horrifying jumpscare.
  */
 export const ClownEntity: React.FC<ClownEntityProps> = ({ stage, faceBox }) => {
   if (stage === "none") return null;
 
-  // Determine which side of the background room is open
   const openSide = faceBox?.openRoomSide || "right";
 
   if (stage === "standing_far") {
     return (
       <div
-        className={`absolute pointer-events-none transition-all duration-1000 ease-out select-none ${
-          openSide === "left" ? "top-6 left-5" : "top-6 right-5"
-        }`}
+        className={`absolute z-[6] pointer-events-none transition-all duration-700 ease-out select-none ${
+          openSide === "left" ? "top-3 left-3" : "top-3 right-3"
+        } w-24 md:w-28 aspect-square flex flex-col items-center justify-center`}
         style={{
-          width: "20%",
-          maxHeight: "38%",
-          filter:
-            "drop-shadow(0 0 12px rgba(0, 0, 0, 0.95)) contrast(1.1) brightness(0.8) blur(0.4px)",
+          filter: "drop-shadow(0 0 10px rgba(0, 0, 0, 0.9))",
         }}
       >
-        {/* Shadow grounded on the room floor */}
-        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-12 h-3 bg-black/60 rounded-full blur-[2px] pointer-events-none" />
-
         <img
           src="/images/creepy_clown_standing.png"
           alt="Entity standing in far room corner"
-          className="w-full h-auto object-contain opacity-85"
+          className="w-full h-full object-contain opacity-95"
         />
+        {/* Subtle shadow beneath his feet */}
+        <div className="w-14 h-2 bg-black/60 rounded-full blur-[2px] -mt-1" />
       </div>
     );
   }
@@ -51,20 +46,18 @@ export const ClownEntity: React.FC<ClownEntityProps> = ({ stage, faceBox }) => {
   if (stage === "near_unsmiling") {
     return (
       <div
-        className={`absolute pointer-events-none transition-all duration-700 ease-out select-none animate-pulse ${
-          openSide === "left" ? "top-2 left-6" : "top-2 right-6"
-        }`}
+        className={`absolute z-[6] pointer-events-none transition-all duration-500 ease-out select-none animate-pulse ${
+          openSide === "left" ? "top-1 left-2" : "top-1 right-2"
+        } w-40 md:w-48 aspect-square flex flex-col items-center justify-center`}
         style={{
-          width: "36%",
-          maxHeight: "65%",
-          animationDuration: "4s",
-          filter: "drop-shadow(0 0 18px rgba(0, 0, 0, 0.98)) contrast(1.18) brightness(0.88)",
+          animationDuration: "3.5s",
+          filter: "drop-shadow(0 0 16px rgba(0, 0, 0, 0.95)) contrast(1.15)",
         }}
       >
         <img
           src="/images/creepy_clown_not_smiling_near.png"
           alt="Entity standing directly behind chair"
-          className="w-full h-auto object-contain opacity-95"
+          className="w-full h-full object-contain opacity-95"
         />
       </div>
     );
