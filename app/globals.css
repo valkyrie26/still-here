@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-void: #050805;
+  --color-phosphor: #20c20e;
+  --color-bright: #3bf824;
+  --color-dim: #0f5907;
+}
+
+body {
+  background-color: var(--color-void);
+  color: var(--color-phosphor);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* CRT Screen Scanline Overlay */
+.crt-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.35) 50%
+  ), linear-gradient(
+    90deg,
+    rgba(255, 0, 0, 0.03),
+    rgba(0, 255, 0, 0.01),
+    rgba(0, 0, 255, 0.03)
+  );
+  background-size: 100% 3px, 6px 100%;
+}
+
+/* CRT Vignette / Curved Screen effect */
+.crt-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 998;
+  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.85), inset 0 0 30px rgba(15, 89, 7, 0.2);
+}
+
+/* Monochrome Green Surveillance Camera Filter */
+.surveillance-filter {
+  filter: grayscale(100%) brightness(0.85) sepia(100%) hue-rotate(85deg) saturate(700%) contrast(1.35);
+}
+
+/* Phosphor Glow effect */
+.phosphor-glow {
+  text-shadow: 0 0 5px rgba(32, 194, 14, 0.7), 0 0 12px rgba(32, 194, 14, 0.4);
+}
+
+.phosphor-glow-bright {
+  text-shadow: 0 0 8px rgba(59, 248, 36, 0.9), 0 0 18px rgba(59, 248, 36, 0.6);
+}
+
+/* Viewfinder Shaking */
+.viewfinder-shake {
+  animation: cameraJitter 0.12s infinite;
+}
+
+@keyframes cameraJitter {
+  0% { transform: translate(0, 0) scale(1.02); }
+  25% { transform: translate(-2px, 1.5px) scale(1.02); }
+  50% { transform: translate(1.5px, -1px) scale(1.02); }
+  75% { transform: translate(-1px, -1.5px) scale(1.02); }
+  100% { transform: translate(2px, 1px) scale(1.02); }
+}
+
+/* Mid-Sentence Violent Glitch */
+.screen-glitch {
+  animation: horizontalTear 0.35s steps(2, end) forwards;
+}
+
+@keyframes horizontalTear {
+  0% {
+    clip-path: inset(0 0 0 0);
+    transform: translate(0);
+    filter: invert(0);
+  }
+  15% {
+    clip-path: inset(20% 0 30% 0);
+    transform: translate(-12px, 2px) skewX(4deg);
+    filter: invert(0.8);
+  }
+  35% {
+    clip-path: inset(55% 0 10% 0);
+    transform: translate(14px, -3px) skewX(-4deg);
+  }
+  55% {
+    clip-path: inset(10% 0 65% 0);
+    transform: translate(-8px, 4px);
+    filter: invert(0.4);
+  }
+  75% {
+    clip-path: inset(40% 0 25% 0);
+    transform: translate(6px, -2px) skewX(2deg);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    transform: translate(0);
+    filter: invert(0);
+  }
+}
+
+/* Text Drift / Falling Effect for Nervous Laughter / High Paranoia */
+.text-drift-fall {
+  display: inline-block;
+  animation: letterDrop 3.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes letterDrop {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  30% { transform: translateY(2px) rotate(1.5deg); }
+  60% { transform: translateY(12px) rotate(4deg); opacity: 0.8; }
+  100% { transform: translateY(45px) rotate(12deg); opacity: 0.2; }
+}
+
+/* Scrollbar Customization */
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #050805;
+}
+::-webkit-scrollbar-thumb {
+  background: #0f5907;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #20c20e;
+}
