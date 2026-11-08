@@ -1,7 +1,7 @@
 /**
  * Procedural Web Audio Engine for POND_OS 99
- * Synthesizes vintage mechanical teletype clicks, low-frequency dread drones,
- * and violent audio glitches entirely within the browser AudioContext.
+ * Synthesizes vintage mechanical teletype clicks, camera shutter snaps,
+ * low-frequency dread drones, and violent audio glitches entirely in browser AudioContext.
  */
 
 class SoundEngine {
@@ -24,7 +24,6 @@ class SoundEngine {
 
   /**
    * Crisp mechanical typewriter click with dynamic pitch decay
-   * @param pitchMultiplier Shifts from 1.0 (crisp teletype) down to 0.4 (heavy dread thud)
    */
   public playKeystroke(pitchMultiplier: number = 1.0) {
     if (this.isMuted) return;
@@ -34,8 +33,8 @@ class SoundEngine {
     const t = ctx.currentTime;
     const clampedPitch = Math.max(0.35, Math.min(1.2, pitchMultiplier));
 
-    // 1. Noise transient for mechanical hammer impact
-    const bufferSize = ctx.sampleRate * 0.035; // 35ms burst
+    // 1. Noise burst
+    const bufferSize = ctx.sampleRate * 0.035;
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
@@ -45,7 +44,6 @@ class SoundEngine {
     const noise = ctx.createBufferSource();
     noise.buffer = buffer;
 
-    // Bandpass filter centered around 1400Hz * pitchMultiplier
     const bandpass = ctx.createBiquadFilter();
     bandpass.type = "bandpass";
     bandpass.frequency.setValueAtTime(1400 * clampedPitch, t);
@@ -79,7 +77,39 @@ class SoundEngine {
   }
 
   /**
-   * Violent screen glitch sting / screech
+   * Archaic camera snapshot shutter sound
+   */
+  public playCameraShutter() {
+    if (this.isMuted) return;
+    const ctx = this.initContext();
+    if (!ctx) return;
+
+    const t = ctx.currentTime;
+
+    // First shutter snap
+    this.playKeystroke(1.2);
+
+    // Second curtain clack 110ms later
+    setTimeout(() => {
+      if (this.ctx) {
+        const t2 = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "square";
+        osc.frequency.setValueAtTime(240, t2);
+        osc.frequency.exponentialRampToValueAtTime(60, t2 + 0.06);
+        gain.gain.setValueAtTime(0.4, t2);
+        gain.gain.exponentialRampToValueAtTime(0.001, t2 + 0.06);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t2);
+        osc.stop(t2 + 0.065);
+      }
+    }, 110);
+  }
+
+  /**
+   * Violent screen glitch sting
    */
   public playGlitchSting() {
     if (this.isMuted) return;
@@ -87,8 +117,6 @@ class SoundEngine {
     if (!ctx) return;
 
     const t = ctx.currentTime;
-
-    // Burst of harsh noise
     const bufferSize = ctx.sampleRate * 0.35;
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -105,7 +133,7 @@ class SoundEngine {
     filter.frequency.linearRampToValueAtTime(120, t + 0.3);
 
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.6, t);
+    gain.gain.setValueAtTime(0.55, t);
     gain.gain.exponentialRampToValueAtTime(0.01, t + 0.35);
 
     noise.connect(filter);
@@ -124,8 +152,6 @@ class SoundEngine {
     if (!ctx) return;
 
     const t = ctx.currentTime;
-
-    // Harsh distorted screech
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
@@ -146,7 +172,7 @@ class SoundEngine {
   }
 
   /**
-   * Low 48Hz paranoia sub-drone
+   * Ambient 48Hz paranoia sub-drone
    */
   public startAmbientDrone() {
     const ctx = this.initContext();
@@ -157,7 +183,7 @@ class SoundEngine {
     const gain = ctx.createGain();
 
     osc.type = "sine";
-    osc.frequency.setValueAtTime(48, t); // 48Hz sub-bass
+    osc.frequency.setValueAtTime(48, t);
 
     gain.gain.setValueAtTime(0.001, t);
     gain.gain.linearRampToValueAtTime(0.12, t + 3);

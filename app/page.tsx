@@ -2,22 +2,18 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Video,
   MessageSquare,
   X,
   Minus,
   Square,
   AlertOctagon,
-  Eye,
   Camera,
   FileText,
-  RefreshCw,
 } from "lucide-react";
 import { WindowsTaskbar } from "@/components/WindowsTaskbar";
 import { DesktopIcons } from "@/components/DesktopIcons";
 import { PolaroidViewer } from "@/components/PolaroidViewer";
 import { ScreenCrack } from "@/components/ScreenCrack";
-import { ClownEntity, ClownStage } from "@/components/ClownEntity";
 import { TelemetryHUD } from "@/components/TelemetryHUD";
 import { useFaceTelemetry } from "@/hooks/useFaceTelemetry";
 import { soundEngine } from "@/utils/sound";
@@ -30,10 +26,10 @@ interface ChatMessage {
 }
 
 export default function Home() {
-  // Window Visibility States
+  // Window Visibility States (No live viewfinder on screen!)
   const [activeWindows, setActiveWindows] = useState({
     chat: true,
-    viewfinder: true,
+    viewfinder: false, // Hidden per user request!
     polaroid: false,
   });
 
@@ -44,25 +40,26 @@ export default function Home() {
     "FATAL EXCEPTION 0E : An unknown presence was detected in your physical space."
   );
 
-  // Clown Entity Stage: "none" | "standing_far" | "near_unsmiling" | "jumpscare_smiling"
-  const [clownStage, setClownStage] = useState<ClownStage>("none");
+  // Screen Flash Effect for Camera Shutter
+  const [cameraFlash, setCameraFlash] = useState(false);
 
-  // Paranoia & FX States
+  // Paranoia & Atmosphere States (Building subtly over time)
   const [glitchActive, setGlitchActive] = useState(false);
-  const [viewfinderShake, setViewfinderShake] = useState(false);
-  const [viewfinderDim, setViewfinderDim] = useState(0); // Clamped between 0 and 0.4
+  const [screenDarkness, setScreenDarkness] = useState(0.0); // 0.0 to 0.45
   const [screenCracked, setScreenCracked] = useState(false);
   const [crackSeverity, setCrackSeverity] = useState<1 | 2 | 3>(1);
   const [textDriftTrigger, setTextDriftTrigger] = useState(false);
-  const [cameraActive, setCameraActive] = useState(false);
-  const [webcamMode, setWebcamMode] = useState<"vintage" | "corrupted">("vintage");
+
+  // Story Sequence Tracking
+  // 0: Initial greeting -> 1: Room check -> 2: "who's behind you?" -> 3: "here let me take a screenshot" -> 4: Escalation
+  const [storyStage, setStoryStage] = useState<number>(0);
 
   // Chat Feed State
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "sys-0",
       sender: "system",
-      text: "POND_OS 99 [DAEMON_LOADED] // SECURE SESSION #4092-A",
+      text: "POND_OS 99 [DAEMON_LOADED] // SECURE TERMINAL ESTABLISHED",
     },
     {
       id: "pond-init",
@@ -73,6 +70,7 @@ export default function Home() {
   const [inputText, setInputText] = useState("");
   const [isAiTyping, setIsAiTyping] = useState(false);
 
+  // Hidden Video Ref for background MediaPipe telemetry & frame capture
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
@@ -87,7 +85,7 @@ export default function Home() {
       if (index >= text.length) {
         clearInterval(interval);
       }
-    }, 40);
+    }, 38);
   }, []);
 
   // Violent screen glitch
@@ -97,144 +95,92 @@ export default function Home() {
     setTimeout(() => setGlitchActive(false), 380);
   }, []);
 
-  // JUMPSCARE TRIGGER
-  const triggerJumpscare = useCallback(() => {
-    setClownStage("jumpscare_smiling");
-    soundEngine.playJumpscareSting();
-    setScreenCracked(true);
-    setCrackSeverity(3);
-    setViewfinderShake(true);
+  // Shutter Snapshot Flash Sequence
+  const triggerScreenshotCapture = useCallback(() => {
+    soundEngine.playCameraShutter();
+    setCameraFlash(true);
+    setTimeout(() => setCameraFlash(false), 220);
 
+    // Pop open the screenshot window after shutter
     setTimeout(() => {
-      setClownStage("none");
-      setViewfinderShake(false);
-      setErrorMessage("FATAL EXCEPTION 0E : IT IS RIGHT BEHIND YOU.");
-      setErrorDialogOpen(true);
-    }, 1100);
+      setActiveWindows((prev) => ({ ...prev, polaroid: true }));
+    }, 400);
   }, []);
 
   // HEAD-TURN DETECTED (|headYaw| > 18 deg)
   const handleHeadTurn = useCallback(() => {
-    if (clownStage === "standing_far") {
-      setClownStage("none"); // It vanishes from the far corner!
-
-      setTimeout(() => {
-        soundEngine.stopAllSound();
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `pond-cutoff-${Date.now()}`,
-            sender: "pond",
-            text: "wait... it's gone? i swear i saw—",
-          },
-        ]);
-
-        triggerGlitchSpike();
-        setScreenCracked(true);
-        setCrackSeverity(1);
-
-        setTimeout(() => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `sys-dc-${Date.now()}`,
-              sender: "system",
-              text: "CONNECTION LOST... ATTEMPTING RECONNECT...",
-            },
-          ]);
-
-          setTimeout(() => {
-            typingAudioPitch.current = 0.75;
-            soundEngine.startAmbientDrone();
-            const reMsg = "sorry about that. glitch in the line. what were we talking about?";
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: `pond-reconnect-${Date.now()}`,
-                sender: "pond",
-                text: reMsg,
-              },
-            ]);
-            playTypewriterForText(reMsg);
-          }, 3000);
-        }, 1200);
-      }, 700);
+    // If the screenshot has been taken or paranoia is building, turning head triggers a sudden micro-glitch
+    if (storyStage >= 2) {
+      triggerGlitchSpike();
+      setScreenCracked(true);
+      setCrackSeverity((prev) => (prev === 3 ? 3 : ((prev + 1) as 1 | 2 | 3)));
     }
-  }, [clownStage, triggerGlitchSpike, playTypewriterForText]);
+  }, [storyStage, triggerGlitchSpike]);
 
-  // GAZE AT VIEWFINDER DETECTED (Looking directly at clown in top-right)
-  const handleViewfinderGaze = useCallback(() => {
-    if (clownStage === "near_unsmiling") {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `unknown-${Date.now()}`,
-          sender: "unknown",
-          text: "you smell nice.",
-        },
-      ]);
-      soundEngine.stopAllSound();
-
-      setTimeout(() => {
-        triggerJumpscare();
-      }, 900);
-    }
-  }, [clownStage, triggerJumpscare]);
-
-  // MediaPipe Vision & Presage Biometric Telemetry Hook
+  // MediaPipe Vision & Presage Biometric Telemetry Hook (runs silently via hidden video)
   const { telemetry, isModelReady } = useFaceTelemetry({
     videoRef,
     enabled: true,
     onHeadTurn: handleHeadTurn,
-    onViewfinderGaze: handleViewfinderGaze,
   });
 
-  // CAMERA INITIALIZATION & ATTACHMENT
-  const startCamera = useCallback(async () => {
-    try {
-      if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-        console.warn("getUserMedia not available");
-        return;
-      }
-
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: "user",
-        },
-        audio: false,
-      });
-
-      mediaStreamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play().catch((e) => console.warn("Video play error:", e));
-        };
-        videoRef.current.play().catch(() => {});
-      }
-      setCameraActive(true);
-    } catch (err) {
-      console.warn("Camera init failed:", err);
-      setCameraActive(false);
-    }
-  }, []);
-
+  // Background Camera Initialization
   useEffect(() => {
-    startCamera();
+    let isCancelled = false;
+
+    async function initHiddenCamera() {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) return;
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: "user",
+          },
+          audio: false,
+        });
+
+        if (isCancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+
+        mediaStreamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current?.play().catch(() => {});
+          };
+          videoRef.current.play().catch(() => {});
+        }
+      } catch (err) {
+        console.warn("Background camera initialization:", err);
+      }
+    }
+
+    initHiddenCamera();
 
     return () => {
+      isCancelled = true;
       if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current.getTracks().forEach((t) => t.stop());
       }
     };
-  }, [startCamera]);
+  }, []);
+
+  // Subtle Random Atmospheric Glitches as session progresses
+  useEffect(() => {
+    const glitchInterval = setInterval(() => {
+      if (storyStage >= 2) {
+        // Subtle 180ms screen glitch occasionally
+        setGlitchActive(true);
+        soundEngine.playKeystroke(0.5);
+        setTimeout(() => setGlitchActive(false), 180);
+      }
+    }, 18000);
+
+    return () => clearInterval(glitchInterval);
+  }, [storyStage]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -242,7 +188,7 @@ export default function Home() {
   }, [messages]);
 
   // Window Toggling
-  const handleToggleWindow = (key: "chat" | "viewfinder" | "polaroid") => {
+  const handleToggleWindow = (key: "chat" | "polaroid") => {
     setActiveWindows((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -257,25 +203,20 @@ export default function Home() {
         triggerGlitchSpike();
         setErrorDialogOpen(true);
       } else if (e.key === "2") {
-        setClownStage((prev) =>
-          prev === "none"
-            ? "standing_far"
-            : prev === "standing_far"
-            ? "near_unsmiling"
-            : prev === "near_unsmiling"
-            ? "jumpscare_smiling"
-            : "none"
-        );
+        // Trigger Screenshot Snapshot sequence manually
+        triggerScreenshotCapture();
       } else if (e.key === "3") {
         setActiveWindows((prev) => ({ ...prev, polaroid: true }));
       } else if (e.key === "4") {
         setScreenCracked((prev) => !prev);
         setCrackSeverity((prev) => (prev === 3 ? 1 : ((prev + 1) as 1 | 2 | 3)));
       } else if (e.key === "5") {
-        handleViewfinderGaze();
+        setTextDriftTrigger((prev) => !prev);
       } else if (e.key === "6") {
-        setClownStage("none");
+        // Reset
+        setStoryStage(0);
         setScreenCracked(false);
+        setScreenDarkness(0);
         typingAudioPitch.current = 1.0;
         setMessages([
           {
@@ -294,9 +235,9 @@ export default function Home() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [triggerGlitchSpike, handleViewfinderGaze]);
+  }, [triggerGlitchSpike, triggerScreenshotCapture]);
 
-  // SEND MESSAGE TO GEMINI / BIO-ADAPTIVE BACKEND
+  // Send Message in Giant Text Chat
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || isAiTyping) return;
@@ -313,8 +254,64 @@ export default function Home() {
     setInputText("");
     setIsAiTyping(true);
 
+    // Subtle screen darkening escalates as conversation deepens
+    setScreenDarkness((prev) => Math.min(0.42, prev + 0.08));
+
+    // EXACT STORY SCRIPT MILESTONES:
+    if (storyStage === 0) {
+      // Step 1: Casual check
+      setTimeout(() => {
+        const reply = "cool. are you in your room right now?";
+        setMessages((prev) => [
+          ...prev,
+          { id: `pond-${Date.now()}`, sender: "pond", text: reply },
+        ]);
+        playTypewriterForText(reply);
+        setStoryStage(1);
+        setIsAiTyping(false);
+      }, 1000);
+      return;
+    }
+
+    if (storyStage === 1) {
+      // Step 2: "who's behind you?"
+      setTimeout(() => {
+        const reply = "wait... who's behind you?";
+        setMessages((prev) => [
+          ...prev,
+          { id: `pond-${Date.now()}`, sender: "pond", text: reply },
+        ]);
+        playTypewriterForText(reply);
+        setStoryStage(2);
+        setIsAiTyping(false);
+      }, 1200);
+      return;
+    }
+
+    if (storyStage === 2) {
+      // Step 3: User says "no one" -> POND says "here let me take a screenshot"
+      setTimeout(() => {
+        const reply = "here let me take a screenshot";
+        setMessages((prev) => [
+          ...prev,
+          { id: `pond-${Date.now()}`, sender: "pond", text: reply },
+        ]);
+        playTypewriterForText(reply);
+        setStoryStage(3);
+        setIsAiTyping(false);
+
+        // Take snapshot after POND finishes typing sentence
+        setTimeout(() => {
+          triggerScreenshotCapture();
+          soundEngine.startAmbientDrone();
+          typingAudioPitch.current = 0.7;
+        }, 1600);
+      }, 1000);
+      return;
+    }
+
+    // Step 4+: Subsequent turns driven by Gemini 2.5 Flash with biometric affect
     try {
-      // Call Gemini 2.5 Flash route with player's real-time biometric telemetry
       const res = await fetch("/api/pond", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -331,27 +328,12 @@ export default function Home() {
           typingAudioPitch.current = data.audioPitch;
         }
 
-        if (data.clownStage && data.clownStage !== "none" && clownStage === "none") {
-          setClownStage(data.clownStage as ClownStage);
-        } else if (data.clownStage === "near_unsmiling") {
-          setClownStage("near_unsmiling");
-        }
-
         if (data.triggerGlitch) {
           triggerGlitchSpike();
         }
 
-        if (data.viewfinderShake) {
-          setViewfinderShake(true);
-          setTimeout(() => setViewfinderShake(false), 800);
-        }
-
         if (data.textDriftEffect) {
           setTextDriftTrigger(true);
-        }
-
-        if (typeof data.viewfinderDimDelta === "number") {
-          setViewfinderDim((prev) => Math.min(0.4, Math.max(0, prev + Math.abs(data.viewfinderDimDelta))));
         }
 
         setMessages((prev) => [
@@ -367,8 +349,7 @@ export default function Home() {
         playTypewriterForText(data.dialogue);
       }
     } catch (err) {
-      console.warn("Backend chat error:", err);
-      const fallbackReply = "are you still listening?";
+      const fallbackReply = "are you looking closely at the photo?";
       setMessages((prev) => [
         ...prev,
         { id: `pond-${Date.now()}`, sender: "pond", text: fallbackReply },
@@ -381,18 +362,26 @@ export default function Home() {
 
   return (
     <main
-      className={`min-h-screen w-full relative overflow-hidden bg-[#008080] select-none font-sans ${
+      className={`min-h-screen w-full relative overflow-hidden bg-[#008080] select-none font-sans flex flex-col items-center justify-center p-3 md:p-6 transition-all duration-1000 ${
         glitchActive ? "screen-glitch" : ""
       }`}
     >
-      {/* CRT Scanlines Overlay */}
+      {/* Subtle CRT Scanlines Overlay */}
       <div className="retro-crt-lines" aria-hidden="true" />
+
+      {/* Screen Darkening Vignette (builds subtly as paranoia escalates) */}
+      <div
+        className="fixed inset-0 bg-black pointer-events-none transition-opacity duration-1000 z-[15]"
+        style={{ opacity: screenDarkness }}
+      />
+
+      {/* Shutter Camera Flash Animation */}
+      {cameraFlash && (
+        <div className="fixed inset-0 bg-white z-[9998] pointer-events-none transition-opacity duration-200" />
+      )}
 
       {/* Screen Crack Glass Shatter Overlay */}
       <ScreenCrack active={screenCracked} severity={crackSeverity} />
-
-      {/* Fullscreen Smiling Clown Jumpscare */}
-      <ClownEntity stage={clownStage === "jumpscare_smiling" ? "jumpscare_smiling" : "none"} />
 
       {/* Virtual Desktop Icons */}
       <DesktopIcons
@@ -402,7 +391,7 @@ export default function Home() {
           setErrorMessage("SYSTEM ANOMALY: Access denied. Unauthorized observer detected.");
           setErrorDialogOpen(true);
         }}
-        anomaliesDiscovered={clownStage === "none" ? 0 : 1}
+        anomaliesDiscovered={storyStage >= 3 ? 1 : 0}
       />
 
       {/* TOP DOCKED: Real-Time Affect & Head-Turn Telemetry HUD */}
@@ -410,81 +399,99 @@ export default function Home() {
         <TelemetryHUD
           telemetry={telemetry}
           isModelReady={isModelReady}
-          clownStage={clownStage}
+          clownStage={storyStage >= 3 ? "near_unsmiling" : "none"}
         />
       </div>
 
-      {/* WINDOW 1: POND Instant Messenger (Windows 98 Style) */}
+      {/* HIDDEN WEBCAM (Runs silently in background for MediaPipe telemetry & photo capture) */}
+      <video
+        ref={(el) => {
+          videoRef.current = el;
+          if (el && mediaStreamRef.current && el.srcObject !== mediaStreamRef.current) {
+            el.srcObject = mediaStreamRef.current;
+            el.play().catch(() => {});
+          }
+        }}
+        autoPlay
+        playsInline
+        muted
+        className="hidden"
+      />
+
+      {/* GIANT TEXT-BASED TERMINAL CHAT (Centerpiece) */}
       {activeWindows.chat && (
         <div
-          className={`absolute top-14 left-28 md:left-36 w-[340px] md:w-[480px] bg-[#c0c0c0] win98-bevel-out shadow-2xl z-30 transition-all ${
-            clownStage === "near_unsmiling" ? "border-red-900" : ""
-          }`}
-          style={{ maxHeight: "calc(100vh - 120px)" }}
+          className="relative z-30 w-full max-w-4xl bg-[#c0c0c0] win98-bevel-out shadow-2xl flex flex-col transition-all duration-500"
+          style={{ height: "calc(100vh - 90px)", maxHeight: "780px" }}
         >
-          {/* Title Bar */}
+          {/* Windows 98 Title Bar */}
           <div
-            className={`flex items-center justify-between px-2 py-1 select-none ${
-              clownStage === "near_unsmiling" ? "win98-titlebar-corrupted" : "win98-titlebar"
+            className={`flex items-center justify-between px-2.5 py-1.5 select-none ${
+              storyStage >= 3 ? "win98-titlebar-corrupted" : "win98-titlebar"
             }`}
           >
-            <div className="flex items-center gap-1.5 text-xs text-white">
-              <MessageSquare className="w-3.5 h-3.5" />
+            <div className="flex items-center gap-2 text-xs md:text-sm text-white font-bold tracking-wide">
+              <MessageSquare className="w-4 h-4 text-emerald-300" />
               <span>
-                {clownStage === "near_unsmiling"
+                {storyStage >= 3
                   ? "POND_OS // UNKNOWN_OBSERVER_PRESENT"
-                  : "POND Instant Messenger v3.1"}
+                  : "POND Instant Messenger v3.1 [DAEMON_ACTIVE]"}
               </span>
             </div>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => handleToggleWindow("chat")}
-                className="win98-bevel-button w-4 h-3.5 flex items-center justify-center text-black text-[10px]"
+                className="win98-bevel-button w-5 h-4 flex items-center justify-center text-black text-xs"
               >
-                <Minus className="w-2.5 h-2.5" />
+                <Minus className="w-3 h-3" />
               </button>
-              <button className="win98-bevel-button w-4 h-3.5 flex items-center justify-center text-black text-[10px]">
+              <button className="win98-bevel-button w-5 h-4 flex items-center justify-center text-black text-xs">
                 <Square className="w-2.5 h-2.5" />
               </button>
               <button
                 onClick={() => handleToggleWindow("chat")}
-                className="win98-bevel-button w-4 h-3.5 flex items-center justify-center text-black text-[10px] font-bold"
+                className="win98-bevel-button w-5 h-4 flex items-center justify-center text-black text-xs font-bold"
               >
-                <X className="w-2.5 h-2.5" />
+                <X className="w-3 h-3" />
               </button>
             </div>
           </div>
 
           {/* Menu Strip */}
-          <div className="px-2 py-0.5 border-b border-neutral-400 text-[11px] text-neutral-800 flex gap-3 font-sans">
-            <span className="hover:underline cursor-pointer">File</span>
-            <span className="hover:underline cursor-pointer">Edit</span>
-            <span className="hover:underline cursor-pointer">View</span>
-            <span
-              onClick={() => setActiveWindows((prev) => ({ ...prev, polaroid: true }))}
-              className="hover:underline cursor-pointer text-red-900 font-semibold"
-            >
-              Examine Photo...
-            </span>
+          <div className="px-3 py-1 border-b border-neutral-400 text-xs text-neutral-800 flex items-center justify-between font-sans bg-[#c0c0c0]">
+            <div className="flex gap-4">
+              <span className="hover:underline cursor-pointer">Session</span>
+              <span className="hover:underline cursor-pointer">Diagnostics</span>
+              <span
+                onClick={triggerScreenshotCapture}
+                className="hover:underline cursor-pointer text-red-900 font-semibold flex items-center gap-1"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                Snapshot Feed
+              </span>
+            </div>
+            <div className="text-[11px] font-mono text-neutral-600">
+              STATUS: <strong className="text-emerald-800">ENCRYPTED_STREAM</strong>
+            </div>
           </div>
 
-          {/* Chat Feed Inner Box */}
-          <div className="p-2 flex flex-col h-[320px] md:h-[370px]">
-            <div className="flex-1 bg-white win98-bevel-in p-2.5 overflow-y-auto space-y-2.5 text-xs font-mono scrollbar-thin">
+          {/* Giant Chat Log Content */}
+          <div className="p-3 md:p-4 flex-1 flex flex-col min-h-0 bg-[#c0c0c0]">
+            <div className="flex-1 bg-white win98-bevel-in p-4 overflow-y-auto space-y-3.5 font-mono text-sm md:text-base leading-relaxed scrollbar-thin shadow-inner">
               {messages.map((msg) => (
                 <div
                   key={msg.id}
-                  className={`leading-relaxed ${
+                  className={`leading-relaxed transition-all duration-300 ${
                     msg.sender === "user"
-                      ? "text-blue-900"
+                      ? "text-blue-900 pl-3 border-l-2 border-blue-400"
                       : msg.sender === "unknown"
-                      ? "text-red-600 font-extrabold tracking-widest animate-pulse"
+                      ? "text-red-600 font-extrabold tracking-widest animate-pulse pl-3 border-l-2 border-red-600"
                       : msg.sender === "pond"
-                      ? "text-neutral-900 font-medium"
-                      : "text-neutral-500 italic text-[11px]"
+                      ? "text-neutral-950 font-medium"
+                      : "text-neutral-500 italic text-xs"
                   } ${(textDriftTrigger || msg.isDrifting) && msg.sender === "pond" ? "text-drift-fall" : ""}`}
                 >
-                  <span className="font-bold mr-1.5">
+                  <span className="font-bold mr-2 text-xs md:text-sm">
                     {msg.sender === "user"
                       ? "[YOU]:"
                       : msg.sender === "unknown"
@@ -500,169 +507,37 @@ export default function Home() {
             </div>
 
             {/* Input Bar */}
-            <form onSubmit={handleSendMessage} className="mt-2 flex gap-1.5">
+            <form onSubmit={handleSendMessage} className="mt-3 flex gap-2">
               <input
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 placeholder={isAiTyping ? "pond is observing..." : "type your response..."}
                 disabled={isAiTyping}
-                className="flex-1 win98-bevel-in px-2 py-1 text-xs font-mono bg-white outline-none disabled:bg-neutral-100"
+                className="flex-1 win98-bevel-in px-3 py-2 text-sm md:text-base font-mono bg-white outline-none disabled:bg-neutral-100 placeholder:text-neutral-400"
                 autoFocus
               />
               <button
                 type="submit"
                 disabled={isAiTyping}
-                className="win98-bevel-button px-3 py-1 text-xs font-sans text-black font-semibold disabled:opacity-50"
+                className="win98-bevel-button px-5 py-2 text-sm font-sans text-black font-bold disabled:opacity-50 tracking-wide"
               >
-                Send
+                Send [↵]
               </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* WINDOW 2: Video Call Viewfinder Window */}
-      {activeWindows.viewfinder && (
-        <div
-          className={`absolute top-14 right-4 md:right-8 w-[320px] md:w-[380px] bg-[#c0c0c0] win98-bevel-out shadow-2xl z-20 ${
-            viewfinderShake ? "viewfinder-shake" : ""
-          }`}
-          onMouseEnter={() => {
-            if (clownStage === "near_unsmiling") {
-              handleViewfinderGaze();
-            }
-          }}
-        >
-          {/* Title Bar */}
-          <div className="win98-titlebar flex items-center justify-between px-2 py-1 select-none">
-            <div className="flex items-center gap-1.5 text-xs text-white">
-              <Video className="w-3.5 h-3.5" />
-              <span>Video Call // USB_CAM_CH01 (640x480)</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => handleToggleWindow("viewfinder")}
-                className="win98-bevel-button w-4 h-3.5 flex items-center justify-center text-black text-[10px]"
-              >
-                <Minus className="w-2.5 h-2.5" />
-              </button>
-              <button
-                onClick={() => handleToggleWindow("viewfinder")}
-                className="win98-bevel-button w-4 h-3.5 flex items-center justify-center text-black text-[10px] font-bold"
-              >
-                <X className="w-2.5 h-2.5" />
-              </button>
-            </div>
-          </div>
+      {/* SCREENSHOT PHOTO POPUP (Appears on "here let me take a screenshot") */}
+      <PolaroidViewer
+        isOpen={activeWindows.polaroid}
+        onClose={() => setActiveWindows((prev) => ({ ...prev, polaroid: false }))}
+        videoRef={videoRef}
+        faceBox={telemetry.faceBox}
+      />
 
-          {/* Subheader Status */}
-          <div className="px-2 py-1 bg-neutral-200 border-b border-neutral-400 flex items-center justify-between text-[11px] text-neutral-800 font-mono">
-            <span className="flex items-center gap-1 text-red-700 font-bold">
-              <span>🦆</span> DUCK_REC [●]
-            </span>
-            <span className="text-neutral-600 text-[10px]">
-              ROOM_OPEN: {telemetry.faceBox.openRoomSide.toUpperCase()} // FPS: 30
-            </span>
-          </div>
-
-          {/* Video Viewport Container */}
-          <div className="p-2">
-            <div className="relative aspect-[4/3] w-full bg-black win98-bevel-in overflow-hidden flex items-center justify-center">
-              {/* Natural Live Webcam Video Feed */}
-              <video
-                ref={(el) => {
-                  videoRef.current = el;
-                  if (el && mediaStreamRef.current && el.srcObject !== mediaStreamRef.current) {
-                    el.srcObject = mediaStreamRef.current;
-                    el.play().catch(() => {});
-                  }
-                }}
-                autoPlay
-                playsInline
-                muted
-                className={`w-full h-full object-cover -scale-x-100 ${
-                  webcamMode === "vintage" ? "webcam-vintage-natural" : "webcam-corrupted"
-                }`}
-              />
-
-              {/* Re-attach button if camera is paused/offline */}
-              {!cameraActive && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-neutral-400 text-xs gap-2 p-4 text-center bg-black/80">
-                  <Eye className="w-8 h-8 opacity-50 animate-pulse text-neutral-300" />
-                  <span className="font-mono">CAMERA PERMISSION REQUIRED</span>
-                  <button
-                    onClick={startCamera}
-                    className="win98-bevel-button px-3 py-1.5 text-xs text-black font-semibold flex items-center gap-1.5 mt-1"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    Enable Camera Feed
-                  </button>
-                </div>
-              )}
-
-              {/* Viewfinder Dimming Overlay (Paranoia effect) */}
-              <div
-                className="absolute inset-0 bg-black pointer-events-none transition-opacity duration-1000 z-[5]"
-                style={{ opacity: Math.min(0.4, Math.abs(viewfinderDim)) }}
-              />
-
-              {/* CLOWN ENTITY IN VIEWFINDER: positioned smartly in background based on surroundings */}
-              {clownStage !== "jumpscare_smiling" && (
-                <ClownEntity stage={clownStage} faceBox={telemetry.faceBox} />
-              )}
-
-              {/* Retro Viewfinder Grid Lines */}
-              <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-2 text-[10px] font-mono text-white/50 z-[7]">
-                <div className="flex justify-between">
-                  <span>[REC] 00:01:42</span>
-                  <span>AUTO-EXPOSURE</span>
-                </div>
-                <div className="flex justify-between items-end">
-                  <span className="text-[9px] text-white/60">CH-01_ROOM_MONITOR</span>
-                  <span className={clownStage !== "none" ? "text-red-300 font-bold" : "text-white/60"}>
-                    {clownStage === "standing_far"
-                      ? `ENTITY: FAR CORNER (${telemetry.faceBox.openRoomSide.toUpperCase()})`
-                      : clownStage === "near_unsmiling"
-                      ? "⚠ ENTITY: BEHIND CHAIR"
-                      : "SUBJECT: ACTIVE"}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Webcam Snapshot Trigger */}
-            <div className="mt-2 flex items-center justify-between">
-              <button
-                onClick={() => setActiveWindows((prev) => ({ ...prev, polaroid: true }))}
-                className="win98-bevel-button px-2 py-1 text-xs text-black font-sans flex items-center gap-1 font-semibold"
-              >
-                <Camera className="w-3.5 h-3.5 text-neutral-800" />
-                Snapshot Polaroid
-              </button>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={startCamera}
-                  title="Reconnect Camera"
-                  className="win98-bevel-button p-1 text-neutral-700 hover:text-black"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                </button>
-                <button
-                  onClick={() =>
-                    setWebcamMode((prev) => (prev === "vintage" ? "corrupted" : "vintage"))
-                  }
-                  className="text-[11px] text-neutral-700 underline font-sans hover:text-black"
-                >
-                  Toggle Night Vision
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* WINDOW 3: Creepy Notepad (README.txt Lore) */}
+      {/* Creepy Notepad (README.txt Lore) */}
       {readmeOpen && (
         <div className="fixed top-24 left-12 md:left-24 w-[310px] md:w-[380px] bg-[#c0c0c0] win98-bevel-out shadow-2xl z-40">
           <div className="win98-titlebar flex items-center justify-between px-2 py-1">
@@ -681,11 +556,11 @@ export default function Home() {
             <div className="win98-bevel-in bg-white p-3 text-xs font-mono text-neutral-800 h-52 overflow-y-auto leading-relaxed">
               <p className="font-bold text-red-900 mb-2">DO NOT LOOK DIRECTLY AT IT.</p>
               <p className="mb-2">
-                If you look at the chat, it stays still. The moment you glance at it in your
-                viewfinder or turn your head to check your room, it takes another step forward.
+                It waits until you feel safe. When it asks to take a photo, do not look behind
+                your chair.
               </p>
               <p className="mb-2">
-                If it whispers to you in the chat, do not look into the camera.
+                It has been standing in the room with you since you launched this program.
               </p>
               <p className="text-neutral-500 text-[11px]">
                 Last modified: 11:42 PM - Subject #4091 (TERMINATED)
@@ -703,7 +578,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* WINDOW 4: Windows 98 Critical Exception Error Dialog */}
+      {/* Windows 98 Critical Exception Error Dialog */}
       {errorDialogOpen && (
         <div className="fixed inset-0 z-[8500] flex items-center justify-center bg-black/40">
           <div className="win98-bevel-out bg-[#c0c0c0] w-[340px] md:w-[420px] p-1 shadow-2xl">
@@ -736,30 +611,15 @@ export default function Home() {
               >
                 OK
               </button>
-              <button
-                onClick={() => setErrorDialogOpen(false)}
-                className="win98-bevel-button px-3 py-1 text-xs text-black"
-              >
-                Ignore
-              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* POLAROID VIEWER POPUP (Live Face Snapshot with Actual Clown Entity) */}
-      <PolaroidViewer
-        isOpen={activeWindows.polaroid}
-        onClose={() => setActiveWindows((prev) => ({ ...prev, polaroid: false }))}
-        videoRef={videoRef}
-        clownStage={clownStage}
-        openRoomSide={telemetry.faceBox.openRoomSide}
-      />
-
       {/* BOTTOM-RIGHT DEBUG & DEMO SHORTCUTS DOCK */}
       <div className="fixed bottom-12 right-4 z-20 bg-[#c0c0c0] win98-bevel-out p-2 shadow-lg max-w-[280px]">
         <div className="text-[11px] font-bold text-neutral-900 border-b border-neutral-400 pb-1 mb-1.5 flex items-center justify-between">
-          <span>DEMO HORROR SHORTCUTS:</span>
+          <span>DEMO SHORTCUTS:</span>
           <span className="text-[10px] text-neutral-600 font-mono">[KEYS 1-6]</span>
         </div>
         <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono">
@@ -767,16 +627,16 @@ export default function Home() {
             <span className="font-bold text-blue-900">[1]</span> Glitch & Error
           </div>
           <div className="bg-white p-1 win98-bevel-in">
-            <span className="font-bold text-blue-900">[2]</span> Clown ({clownStage})
+            <span className="font-bold text-red-900">[2]</span> Shutter Snap
           </div>
           <div className="bg-white p-1 win98-bevel-in">
-            <span className="font-bold text-red-900">[3]</span> Face Polaroid
+            <span className="font-bold text-blue-900">[3]</span> Photo View
           </div>
           <div className="bg-white p-1 win98-bevel-in">
-            <span className="font-bold text-blue-900">[4]</span> Screen Cracks ({screenCracked ? `L${crackSeverity}` : "OFF"})
+            <span className="font-bold text-blue-900">[4]</span> Screen Cracks
           </div>
           <div className="bg-white p-1 win98-bevel-in">
-            <span className="font-bold text-red-900">[5]</span> Gaze Trap Scare
+            <span className="font-bold text-blue-900">[5]</span> Text Drift
           </div>
           <div className="bg-white p-1 win98-bevel-in">
             <span className="font-bold text-blue-900">[6]</span> Reset Arc
@@ -786,10 +646,17 @@ export default function Home() {
 
       {/* WINDOWS 98 BOTTOM TASKBAR */}
       <WindowsTaskbar
-        activeWindows={activeWindows}
-        onToggleWindow={handleToggleWindow}
+        activeWindows={{
+          chat: activeWindows.chat,
+          viewfinder: false,
+          polaroid: activeWindows.polaroid,
+        }}
+        onToggleWindow={(key) => {
+          if (key === "chat") handleToggleWindow("chat");
+          if (key === "polaroid") handleToggleWindow("polaroid");
+        }}
         onEmergencyGlitch={triggerGlitchSpike}
-        shadowStage={clownStage === "none" ? 0 : 2}
+        shadowStage={storyStage >= 3 ? 2 : 0}
       />
     </main>
   );
