@@ -13,7 +13,6 @@ import {
 import { WindowsTaskbar } from "@/components/WindowsTaskbar";
 import { DesktopIcons } from "@/components/DesktopIcons";
 import { PolaroidViewer } from "@/components/PolaroidViewer";
-import { ScreenCrack } from "@/components/ScreenCrack";
 import { TelemetryHUD } from "@/components/TelemetryHUD";
 import { useFaceTelemetry } from "@/hooks/useFaceTelemetry";
 import { soundEngine } from "@/utils/sound";
@@ -26,14 +25,14 @@ interface ChatMessage {
 }
 
 export default function Home() {
-  // Window Visibility States (No live viewfinder on screen!)
+  // Window Visibility States (No live viewfinder box!)
   const [activeWindows, setActiveWindows] = useState({
     chat: true,
-    viewfinder: false, // Hidden per user request!
+    viewfinder: false,
     polaroid: false,
   });
 
-  // Dialog & Horror Popups
+  // Dialog & Lore Popups
   const [readmeOpen, setReadmeOpen] = useState(false);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState(
@@ -45,9 +44,7 @@ export default function Home() {
 
   // Paranoia & Atmosphere States (Building subtly over time)
   const [glitchActive, setGlitchActive] = useState(false);
-  const [screenDarkness, setScreenDarkness] = useState(0.0); // 0.0 to 0.45
-  const [screenCracked, setScreenCracked] = useState(false);
-  const [crackSeverity, setCrackSeverity] = useState<1 | 2 | 3>(1);
+  const [screenDarkness, setScreenDarkness] = useState(0.0); // 0.0 to 0.4
   const [textDriftTrigger, setTextDriftTrigger] = useState(false);
 
   // Story Sequence Tracking
@@ -88,32 +85,29 @@ export default function Home() {
     }, 38);
   }, []);
 
-  // Violent screen glitch
+  // Subtle screen glitch
   const triggerGlitchSpike = useCallback(() => {
     setGlitchActive(true);
     soundEngine.playGlitchSting();
-    setTimeout(() => setGlitchActive(false), 380);
+    setTimeout(() => setGlitchActive(false), 280);
   }, []);
 
   // Shutter Snapshot Flash Sequence
   const triggerScreenshotCapture = useCallback(() => {
     soundEngine.playCameraShutter();
     setCameraFlash(true);
-    setTimeout(() => setCameraFlash(false), 220);
+    setTimeout(() => setCameraFlash(false), 180);
 
     // Pop open the screenshot window after shutter
     setTimeout(() => {
       setActiveWindows((prev) => ({ ...prev, polaroid: true }));
-    }, 400);
+    }, 350);
   }, []);
 
   // HEAD-TURN DETECTED (|headYaw| > 18 deg)
   const handleHeadTurn = useCallback(() => {
-    // If the screenshot has been taken or paranoia is building, turning head triggers a sudden micro-glitch
     if (storyStage >= 2) {
       triggerGlitchSpike();
-      setScreenCracked(true);
-      setCrackSeverity((prev) => (prev === 3 ? 3 : ((prev + 1) as 1 | 2 | 3)));
     }
   }, [storyStage, triggerGlitchSpike]);
 
@@ -172,12 +166,11 @@ export default function Home() {
   useEffect(() => {
     const glitchInterval = setInterval(() => {
       if (storyStage >= 2) {
-        // Subtle 180ms screen glitch occasionally
         setGlitchActive(true);
         soundEngine.playKeystroke(0.5);
-        setTimeout(() => setGlitchActive(false), 180);
+        setTimeout(() => setGlitchActive(false), 160);
       }
-    }, 18000);
+    }, 20000);
 
     return () => clearInterval(glitchInterval);
   }, [storyStage]);
@@ -203,19 +196,16 @@ export default function Home() {
         triggerGlitchSpike();
         setErrorDialogOpen(true);
       } else if (e.key === "2") {
-        // Trigger Screenshot Snapshot sequence manually
         triggerScreenshotCapture();
       } else if (e.key === "3") {
         setActiveWindows((prev) => ({ ...prev, polaroid: true }));
       } else if (e.key === "4") {
-        setScreenCracked((prev) => !prev);
-        setCrackSeverity((prev) => (prev === 3 ? 1 : ((prev + 1) as 1 | 2 | 3)));
-      } else if (e.key === "5") {
         setTextDriftTrigger((prev) => !prev);
+      } else if (e.key === "5") {
+        setScreenDarkness((prev) => (prev > 0 ? 0 : 0.35));
       } else if (e.key === "6") {
         // Reset
         setStoryStage(0);
-        setScreenCracked(false);
         setScreenDarkness(0);
         typingAudioPitch.current = 1.0;
         setMessages([
@@ -254,12 +244,11 @@ export default function Home() {
     setInputText("");
     setIsAiTyping(true);
 
-    // Subtle screen darkening escalates as conversation deepens
-    setScreenDarkness((prev) => Math.min(0.42, prev + 0.08));
+    // Subtle screen darkening escalates
+    setScreenDarkness((prev) => Math.min(0.38, prev + 0.08));
 
     // EXACT STORY SCRIPT MILESTONES:
     if (storyStage === 0) {
-      // Step 1: Casual check
       setTimeout(() => {
         const reply = "cool. are you in your room right now?";
         setMessages((prev) => [
@@ -269,12 +258,11 @@ export default function Home() {
         playTypewriterForText(reply);
         setStoryStage(1);
         setIsAiTyping(false);
-      }, 1000);
+      }, 900);
       return;
     }
 
     if (storyStage === 1) {
-      // Step 2: "who's behind you?"
       setTimeout(() => {
         const reply = "wait... who's behind you?";
         setMessages((prev) => [
@@ -284,12 +272,12 @@ export default function Home() {
         playTypewriterForText(reply);
         setStoryStage(2);
         setIsAiTyping(false);
-      }, 1200);
+      }, 1100);
       return;
     }
 
     if (storyStage === 2) {
-      // Step 3: User says "no one" -> POND says "here let me take a screenshot"
+      // User says "no one" -> POND replies "here let me take a screenshot"
       setTimeout(() => {
         const reply = "here let me take a screenshot";
         setMessages((prev) => [
@@ -300,17 +288,17 @@ export default function Home() {
         setStoryStage(3);
         setIsAiTyping(false);
 
-        // Take snapshot after POND finishes typing sentence
+        // Take snapshot right after message is typed
         setTimeout(() => {
           triggerScreenshotCapture();
           soundEngine.startAmbientDrone();
           typingAudioPitch.current = 0.7;
-        }, 1600);
-      }, 1000);
+        }, 1500);
+      }, 900);
       return;
     }
 
-    // Step 4+: Subsequent turns driven by Gemini 2.5 Flash with biometric affect
+    // Step 4+: Subsequent turns driven by Gemini 2.5 Flash
     try {
       const res = await fetch("/api/pond", {
         method: "POST",
@@ -349,7 +337,7 @@ export default function Home() {
         playTypewriterForText(data.dialogue);
       }
     } catch (err) {
-      const fallbackReply = "are you looking closely at the photo?";
+      const fallbackReply = "look closely at the photo.";
       setMessages((prev) => [
         ...prev,
         { id: `pond-${Date.now()}`, sender: "pond", text: fallbackReply },
@@ -369,7 +357,7 @@ export default function Home() {
       {/* Subtle CRT Scanlines Overlay */}
       <div className="retro-crt-lines" aria-hidden="true" />
 
-      {/* Screen Darkening Vignette (builds subtly as paranoia escalates) */}
+      {/* Screen Darkening Vignette (builds subtly over time) */}
       <div
         className="fixed inset-0 bg-black pointer-events-none transition-opacity duration-1000 z-[15]"
         style={{ opacity: screenDarkness }}
@@ -379,9 +367,6 @@ export default function Home() {
       {cameraFlash && (
         <div className="fixed inset-0 bg-white z-[9998] pointer-events-none transition-opacity duration-200" />
       )}
-
-      {/* Screen Crack Glass Shatter Overlay */}
-      <ScreenCrack active={screenCracked} severity={crackSeverity} />
 
       {/* Virtual Desktop Icons */}
       <DesktopIcons
@@ -403,7 +388,7 @@ export default function Home() {
         />
       </div>
 
-      {/* HIDDEN WEBCAM (Runs silently in background for MediaPipe telemetry & photo capture) */}
+      {/* HIDDEN WEBCAM (Runs silently in background for MediaPipe telemetry & frame capture) */}
       <video
         ref={(el) => {
           videoRef.current = el;
@@ -418,7 +403,7 @@ export default function Home() {
         className="hidden"
       />
 
-      {/* GIANT TEXT-BASED TERMINAL CHAT (Centerpiece) */}
+      {/* GIANT TEXT-BASED TERMINAL CHAT */}
       {activeWindows.chat && (
         <div
           className="relative z-30 w-full max-w-4xl bg-[#c0c0c0] win98-bevel-out shadow-2xl flex flex-col transition-all duration-500"
@@ -529,7 +514,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* SCREENSHOT PHOTO POPUP (Appears on "here let me take a screenshot") */}
+      {/* CLEAN WINDOWS 98 IMAGE VIEWER (Pops open on "here let me take a screenshot") */}
       <PolaroidViewer
         isOpen={activeWindows.polaroid}
         onClose={() => setActiveWindows((prev) => ({ ...prev, polaroid: false }))}
@@ -633,10 +618,10 @@ export default function Home() {
             <span className="font-bold text-blue-900">[3]</span> Photo View
           </div>
           <div className="bg-white p-1 win98-bevel-in">
-            <span className="font-bold text-blue-900">[4]</span> Screen Cracks
+            <span className="font-bold text-blue-900">[4]</span> Text Drift
           </div>
           <div className="bg-white p-1 win98-bevel-in">
-            <span className="font-bold text-blue-900">[5]</span> Text Drift
+            <span className="font-bold text-blue-900">[5]</span> Darken Screen
           </div>
           <div className="bg-white p-1 win98-bevel-in">
             <span className="font-bold text-blue-900">[6]</span> Reset Arc

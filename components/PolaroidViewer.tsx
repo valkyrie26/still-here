@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { X, Camera, RefreshCw, AlertTriangle } from "lucide-react";
+import { X, Minus, Square, Image as ImageIcon, RefreshCw, ZoomIn, Printer } from "lucide-react";
 import { FaceBox } from "@/utils/telemetry";
 
 interface PhotoViewerProps {
@@ -12,9 +12,9 @@ interface PhotoViewerProps {
 }
 
 /**
- * ScreenshotViewer Component
- * Captures the player's real webcam frame and composites a human-scaled, faded
- * ghostly clown lurking directly behind their head/shoulder like a shadow.
+ * Clean Windows 98 Photo Viewer ("Imaging for Windows")
+ * Captures player's frame and composites creepy_clown_standing standing
+ * from the bottom of the frame behind the player like a full-bodied ghost.
  */
 export const PolaroidViewer: React.FC<PhotoViewerProps> = ({
   isOpen,
@@ -33,8 +33,8 @@ export const PolaroidViewer: React.FC<PhotoViewerProps> = ({
     setDeveloping(true);
 
     const canvas = document.createElement("canvas");
-    canvas.width = 540;
-    canvas.height = 420;
+    canvas.width = 640;
+    canvas.height = 480;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -45,80 +45,67 @@ export const PolaroidViewer: React.FC<PhotoViewerProps> = ({
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     ctx.restore();
 
-    // 2. Vintage surveillance CCTV grading
-    ctx.fillStyle = "rgba(10, 20, 15, 0.15)";
+    // 2. Vintage camera grading
+    ctx.fillStyle = "rgba(10, 20, 15, 0.08)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 3. Composite human-scaled, faded ghostly clown hiding behind shoulder/head
+    // 3. Composite creepy_clown_standing standing from bottom of frame
     const clownImg = new Image();
-    // Using near unsmiling clown for life-sized shoulder/head reference
-    clownImg.src = "/images/creepy_clown_not_smiling_near.png";
+    clownImg.src = "/images/creepy_clown_standing.png";
 
     clownImg.onload = () => {
       ctx.save();
 
-      // Determine placement matching player's head position
-      const headCenterX = faceBox ? faceBox.centerX * canvas.width : canvas.width * 0.5;
-      const headCenterY = faceBox ? faceBox.centerY * canvas.height : canvas.height * 0.45;
       const openSide = faceBox?.openRoomSide || "right";
 
-      // Scale clown to match human proportions right behind them
-      const clownW = 220;
-      const clownH = 260;
+      // Height: stands tall from the bottom of the frame (approx 85% of frame height)
+      const clownH = Math.round(canvas.height * 0.88);
+      const clownW = clownH; // 350x350 square image
 
-      // Position: hiding right behind user's shoulder / head
+      // Y position: grounded directly at the bottom edge of the frame
+      const clownY = canvas.height - clownH;
+
+      // X position: standing in the room behind the user's shoulder
       const clownX =
         openSide === "right"
-          ? Math.min(canvas.width - clownW - 20, headCenterX + 35)
-          : Math.max(20, headCenterX - clownW - 35);
-      const clownY = Math.max(15, headCenterY - 110);
+          ? canvas.width - clownW + 35
+          : -35;
 
-      // Eerie shadow aura behind clown
-      const aura = ctx.createRadialGradient(
-        clownX + clownW / 2,
-        clownY + clownH / 2,
-        20,
-        clownX + clownW / 2,
-        clownY + clownH / 2,
-        clownW / 2 + 30
-      );
-      aura.addColorStop(0, "rgba(0, 0, 0, 0.6)");
-      aura.addColorStop(1, "rgba(0, 0, 0, 0)");
-      ctx.fillStyle = aura;
-      ctx.fillRect(clownX - 30, clownY - 30, clownW + 60, clownH + 60);
+      // Floor shadow under clown's feet
+      ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+      ctx.beginPath();
+      ctx.ellipse(clownX + clownW / 2, canvas.height - 12, clownW * 0.32, 16, 0, 0, Math.PI * 2);
+      ctx.fill();
 
-      // Faded, ghostly opacity (~75%) so it blends eerily like a shadow into the real room
-      ctx.globalAlpha = 0.78;
-      ctx.filter = "contrast(1.2) brightness(0.85) blur(0.6px)";
+      // Faded ghostly opacity (~82%) with slight soft edge
+      ctx.globalAlpha = 0.82;
+      ctx.filter = "contrast(1.15) brightness(0.88)";
       ctx.drawImage(clownImg, clownX, clownY, clownW, clownH);
       ctx.restore();
 
-      // 4. Subtle camera vignette & scanline grain
+      // 4. Subtle camera vignette
       const vignette = ctx.createRadialGradient(
         canvas.width / 2,
         canvas.height / 2,
-        canvas.width * 0.3,
+        canvas.width * 0.35,
         canvas.width / 2,
         canvas.height / 2,
         canvas.width * 0.75
       );
       vignette.addColorStop(0, "rgba(0,0,0,0)");
-      vignette.addColorStop(1, "rgba(5,10,5,0.65)");
+      vignette.addColorStop(1, "rgba(0,10,0,0.5)");
       ctx.fillStyle = vignette;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       const now = new Date();
-      setTimestamp(
-        `AUTO_SCREENSHOT_CH01 // ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`
-      );
-      setPhotoDataUrl(canvas.toDataURL("image/jpeg", 0.92));
+      setTimestamp(`${now.toLocaleDateString()} ${now.toLocaleTimeString()}`);
+      setPhotoDataUrl(canvas.toDataURL("image/jpeg", 0.94));
       setDeveloping(false);
     };
 
-    // Fallback if image caching takes a moment
     setTimeout(() => {
       if (!photoDataUrl) {
-        setPhotoDataUrl(canvas.toDataURL("image/jpeg", 0.85));
+        setPhotoDataUrl(canvas.toDataURL("image/jpeg", 0.88));
         setDeveloping(false);
       }
     }, 400);
@@ -133,74 +120,95 @@ export const PolaroidViewer: React.FC<PhotoViewerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[8000] flex items-center justify-center bg-black/70 backdrop-blur-[3px] p-4">
-      {/* Windows 98 Image Viewer Window */}
-      <div className="win98-bevel-out bg-[#c0c0c0] p-1 w-full max-w-[560px] shadow-2xl animate-glitch">
+    <div className="fixed inset-0 z-[8000] flex items-center justify-center bg-black/60 backdrop-blur-[2px] p-4 select-none">
+      {/* Clean Windows 98 Image Viewer Window */}
+      <div className="win98-bevel-out bg-[#c0c0c0] p-1 w-full max-w-[620px] shadow-2xl animate-glitch flex flex-col">
         {/* Title Bar */}
-        <div className="win98-titlebar-corrupted flex items-center justify-between px-2 py-1">
-          <div className="flex items-center gap-1.5 text-xs text-white">
-            <Camera className="w-3.5 h-3.5 text-red-300" />
-            <span>POND_OS // CAPTURED_FRAME_094.BMP</span>
+        <div className="win98-titlebar flex items-center justify-between px-2 py-1">
+          <div className="flex items-center gap-1.5 text-xs text-white font-bold">
+            <ImageIcon className="w-3.5 h-3.5" />
+            <span>Imaging - [SURVEILLANCE_ROOM_01.BMP]</span>
           </div>
-          <button
-            onClick={onClose}
-            className="win98-bevel-button w-5 h-4 flex items-center justify-center text-black font-bold text-xs"
-          >
-            <X className="w-3 h-3" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button className="win98-bevel-button w-4 h-3.5 flex items-center justify-center text-black text-[10px]">
+              <Minus className="w-2.5 h-2.5" />
+            </button>
+            <button className="win98-bevel-button w-4 h-3.5 flex items-center justify-center text-black text-[10px]">
+              <Square className="w-2.5 h-2.5" />
+            </button>
+            <button
+              onClick={onClose}
+              className="win98-bevel-button w-4 h-3.5 flex items-center justify-center text-black font-bold text-[10px]"
+            >
+              <X className="w-2.5 h-2.5" />
+            </button>
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="p-3 flex flex-col items-center">
-          {/* Photo Frame */}
-          <div className="win98-bevel-in bg-black w-full aspect-[4/3] max-h-[380px] overflow-hidden relative flex items-center justify-center">
+        {/* Windows 98 Menu Bar */}
+        <div className="px-2 py-0.5 border-b border-neutral-400 text-xs text-neutral-800 flex items-center gap-3 font-sans bg-[#c0c0c0]">
+          <span className="hover:underline cursor-pointer">File</span>
+          <span className="hover:underline cursor-pointer">Edit</span>
+          <span className="hover:underline cursor-pointer">View</span>
+          <span className="hover:underline cursor-pointer">Page</span>
+          <span className="hover:underline cursor-pointer">Zoom</span>
+          <span className="hover:underline cursor-pointer">Help</span>
+        </div>
+
+        {/* Toolbar */}
+        <div className="px-2 py-1 border-b border-neutral-400 flex items-center gap-2 bg-[#d4d0c8] text-xs">
+          <button
+            onClick={captureAndRenderScreenshot}
+            className="win98-bevel-button px-2 py-0.5 flex items-center gap-1 text-[11px] text-black"
+          >
+            <RefreshCw className="w-3 h-3" />
+            <span>Refresh</span>
+          </button>
+          <div className="h-4 w-px bg-neutral-400" />
+          <span className="text-[11px] text-neutral-700 flex items-center gap-1">
+            <ZoomIn className="w-3 h-3" /> 100%
+          </span>
+          <div className="h-4 w-px bg-neutral-400" />
+          <span className="text-[11px] text-red-900 font-semibold italic ml-auto">
+            UNIDENTIFIED SHADOW DETECTED IN ROOM
+          </span>
+        </div>
+
+        {/* Image Content Container */}
+        <div className="p-2.5 bg-[#808080]">
+          <div className="win98-bevel-in bg-black w-full aspect-[4/3] max-h-[420px] overflow-hidden relative flex items-center justify-center">
             {photoDataUrl && !developing ? (
               <img
                 src={photoDataUrl}
-                alt="Captured camera frame with shadow entity"
-                className="w-full h-full object-cover filter contrast-[1.08]"
+                alt="Captured surveillance frame with standing clown"
+                className="w-full h-full object-cover"
               />
             ) : (
               <div className="flex flex-col items-center gap-2 text-neutral-400 font-mono text-xs">
                 <RefreshCw className="w-6 h-6 animate-spin text-neutral-300" />
-                <span>PROCESSING SURVEILLANCE BUFFER...</span>
+                <span>RENDERING HIGH-RES BITMAP...</span>
               </div>
             )}
 
-            {/* Red REC Watermark */}
-            <div className="absolute top-2 left-2 flex items-center gap-1.5 text-[10px] font-mono text-red-500 font-bold bg-black/60 px-2 py-0.5 rounded">
-              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
-              <span>RECORDED_FRAME</span>
+            {/* REC Timestamp Watermark */}
+            <div className="absolute top-2 left-2 flex items-center gap-1 text-[10px] font-mono text-white/80 bg-black/60 px-2 py-0.5 rounded">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+              <span>CH-01_STILL // {timestamp}</span>
             </div>
           </div>
+        </div>
 
-          {/* Caption Ticker */}
-          <div className="w-full mt-2.5 px-1 flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-mono text-[11px] text-neutral-800">
-            <span className="text-red-900 font-bold flex items-center gap-1">
-              <AlertTriangle className="w-3.5 h-3.5 text-red-700 inline" />
-              &quot;look behind you. what is that?&quot;
-            </span>
-            <span className="text-[10px] text-neutral-600">{timestamp}</span>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="w-full mt-3 pt-2 border-t border-neutral-400 flex items-center justify-between text-xs font-mono">
-            <span className="text-neutral-600 text-[11px]">FORMAT: RAW_RGB_FRAME</span>
-            <div className="flex gap-2">
-              <button
-                onClick={captureAndRenderScreenshot}
-                className="win98-bevel-button px-2.5 py-1 text-black flex items-center gap-1 text-[11px]"
-              >
-                <RefreshCw className="w-3 h-3" />
-                Retake
-              </button>
-              <button
-                onClick={onClose}
-                className="win98-bevel-button px-4 py-1 text-black font-semibold text-[11px]"
-              >
-                Close
-              </button>
-            </div>
+        {/* Status Bar */}
+        <div className="px-2 py-0.5 border-t border-neutral-400 flex items-center justify-between text-[11px] font-sans text-neutral-700 bg-[#c0c0c0]">
+          <span>640 x 480 pixels | 24-bit TrueColor</span>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-red-800 font-bold">STATUS: OBSERVED</span>
+            <button
+              onClick={onClose}
+              className="win98-bevel-button px-3 py-0.5 text-xs text-black font-semibold"
+            >
+              Close
+            </button>
           </div>
         </div>
       </div>

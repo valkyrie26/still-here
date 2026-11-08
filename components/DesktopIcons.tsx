@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Monitor, Trash2, FileText, Camera, ShieldAlert, Image as ImageIcon } from "lucide-react";
+import { Monitor, Trash2, FileText, Image as ImageIcon } from "lucide-react";
 
 interface DesktopIconProps {
   onOpenPolaroid: () => void;
@@ -17,11 +17,11 @@ export const DesktopIcons: React.FC<DesktopIconProps> = ({
   anomaliesDiscovered,
 }) => {
   return (
-    <div className="absolute top-4 left-4 flex flex-col gap-5 z-10 select-none">
+    <div className="absolute top-12 left-4 flex flex-col gap-6 z-10 select-none">
       {/* My Computer */}
       <button
         onDoubleClick={onTriggerError}
-        className="flex flex-col items-center w-18 p-1 rounded hover:bg-blue-900/40 focus:bg-blue-900/60 focus:outline-dashed focus:outline-1 focus:outline-white text-white group"
+        className="flex flex-col items-center w-20 p-1 rounded hover:bg-blue-900/40 focus:bg-blue-900/60 focus:outline-dashed focus:outline-1 focus:outline-white text-white group"
       >
         <div className="w-10 h-10 bg-amber-200/90 rounded-sm border border-neutral-700 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
           <Monitor className="w-6 h-6 text-neutral-800" />
@@ -34,7 +34,7 @@ export const DesktopIcons: React.FC<DesktopIconProps> = ({
       {/* Recycle Bin */}
       <button
         onDoubleClick={onTriggerError}
-        className="flex flex-col items-center w-18 p-1 rounded hover:bg-blue-900/40 focus:bg-blue-900/60 focus:outline-dashed focus:outline-1 focus:outline-white text-white group"
+        className="flex flex-col items-center w-20 p-1 rounded hover:bg-blue-900/40 focus:bg-blue-900/60 focus:outline-dashed focus:outline-1 focus:outline-white text-white group"
       >
         <div className="w-10 h-10 bg-neutral-300 rounded-sm border border-neutral-700 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
           <Trash2 className="w-6 h-6 text-neutral-700" />
@@ -44,29 +44,28 @@ export const DesktopIcons: React.FC<DesktopIconProps> = ({
         </span>
       </button>
 
-      {/* Mysterious Text Note: README.txt */}
+      {/* README.txt */}
       <button
         onDoubleClick={onOpenReadme}
         onClick={onOpenReadme}
-        className="flex flex-col items-center w-18 p-1 rounded hover:bg-blue-900/40 focus:bg-blue-900/60 focus:outline-dashed focus:outline-1 focus:outline-white text-white group"
+        className="flex flex-col items-center w-20 p-1 rounded hover:bg-blue-900/40 focus:bg-blue-900/60 focus:outline-dashed focus:outline-1 focus:outline-white text-white group"
       >
         <div className="w-10 h-10 bg-white rounded-sm border border-neutral-700 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform relative">
           <FileText className="w-6 h-6 text-blue-700" />
-          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-600 rounded-full animate-ping" />
         </div>
         <span className="text-[11px] mt-1 font-sans text-center drop-shadow-[0_1px_2px_rgba(0,0,0,1)] text-amber-200 font-semibold">
           README.txt
         </span>
       </button>
 
-      {/* Mysterious Polaroid File: SURVEILLANCE.pol */}
+      {/* SURVEILLANCE_01.bmp */}
       <button
         onDoubleClick={onOpenPolaroid}
         onClick={onOpenPolaroid}
-        className="flex flex-col items-center w-18 p-1 rounded hover:bg-blue-900/40 focus:bg-blue-900/60 focus:outline-dashed focus:outline-1 focus:outline-white text-white group"
+        className="flex flex-col items-center w-20 p-1 rounded hover:bg-blue-900/40 focus:bg-blue-900/60 focus:outline-dashed focus:outline-1 focus:outline-white text-white group"
       >
         <div className="w-10 h-10 bg-neutral-100 rounded-sm border-2 border-red-800 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform relative">
-          <Camera className="w-6 h-6 text-neutral-800" />
+          <ImageIcon className="w-6 h-6 text-neutral-800" />
           {anomaliesDiscovered > 0 && (
             <span className="absolute -bottom-1 -right-1 bg-red-600 text-white text-[9px] px-1 rounded-sm font-bold">
               !
@@ -74,20 +73,7 @@ export const DesktopIcons: React.FC<DesktopIconProps> = ({
           )}
         </div>
         <span className="text-[11px] mt-1 font-sans text-center drop-shadow-[0_1px_2px_rgba(0,0,0,1)] text-red-300 font-bold">
-          POLAROID_01.pol
-        </span>
-      </button>
-
-      {/* Mysterious Image: DO_NOT_LOOK.bmp */}
-      <button
-        onDoubleClick={onOpenPolaroid}
-        className="flex flex-col items-center w-18 p-1 rounded hover:bg-blue-900/40 focus:bg-blue-900/60 focus:outline-dashed focus:outline-1 focus:outline-white text-white group"
-      >
-        <div className="w-10 h-10 bg-neutral-200 rounded-sm border border-neutral-700 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-          <ImageIcon className="w-6 h-6 text-amber-800" />
-        </div>
-        <span className="text-[11px] mt-1 font-sans text-center drop-shadow-[0_1px_2px_rgba(0,0,0,1)] text-neutral-200">
-          WHO_IS_IT.bmp
+          ROOM_01.bmp
         </span>
       </button>
     </div>
