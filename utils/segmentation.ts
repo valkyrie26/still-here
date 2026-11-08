@@ -50,6 +50,8 @@ export async function initSelfieSegmenter() {
 
 /**
  * Creates an alpha-cutout canvas of the player
+ * Flipped / calibrated so the player's real body is 100% opaque foreground
+ * and room background is transparent.
  */
 async function extractPlayerForegroundCutout(
   videoCanvas: HTMLCanvasElement,
@@ -83,16 +85,32 @@ async function extractPlayerForegroundCutout(
         const scaleX = maskWidth / width;
         const scaleY = maskHeight / height;
 
+        // Auto-detect person category vs room background category:
+        // Top-left corner (0,0) is always the room/wall background
+        const cornerBgVal = maskData[0];
+
+        // Center point where player's face/chest sits
+        const sampleX = Math.min(maskWidth - 1, Math.max(0, Math.floor(maskWidth * (faceBox?.centerX ?? 0.5))));
+        const sampleY = Math.min(maskHeight - 1, Math.max(0, Math.floor(maskHeight * (faceBox?.centerY ?? 0.45))));
+        const centerPersonVal = maskData[sampleY * maskWidth + sampleX];
+
+        // Person set is distinctly the opposite category of the corner background
+        const personCategoryVal = centerPersonVal !== cornerBgVal ? centerPersonVal : (cornerBgVal === 0 ? 1 : 0);
+
         for (let y = 0; y < height; y++) {
           const maskY = Math.min(maskHeight - 1, Math.floor(y * scaleY));
           for (let x = 0; x < width; x++) {
             const maskX = Math.min(maskWidth - 1, Math.floor(x * scaleX));
             const maskIdx = maskY * maskWidth + maskX;
-            // 0 = background, non-zero / 255 = person
-            const isPerson = maskData[maskIdx] > 0;
+
+            // Invert / take the person set:
+            const isPerson = maskData[maskIdx] === personCategoryVal;
             const pixelIdx = (y * width + x) * 4;
+
             if (!isPerson) {
-              data[pixelIdx + 3] = 0; // Transparent background
+              data[pixelIdx + 3] = 0; // Make background transparent
+            } else {
+              data[pixelIdx + 3] = 255; // Keep player 100% opaque
             }
           }
         }
@@ -174,7 +192,7 @@ export async function compositeLayeredScreenshot(
   // LAYER 1: Room Background
   ctx.drawImage(videoCanvas, 0, 0);
 
-  // Slight atmospheric tint to background
+  // Atmospheric grading
   ctx.fillStyle = "rgba(10, 15, 20, 0.12)";
   ctx.fillRect(0, 0, width, height);
 

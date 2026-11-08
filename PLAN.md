@@ -7,124 +7,60 @@
 
 ## Architecture & File Mapping
 
-### 1. Permission & Onboarding (`components/PermissionModal.tsx`, `app/page.tsx`)
-- **Purpose**: Clear, immersive Windows 98 Hardware Setup Wizard requesting camera and microphone access upfront before the terminal loads.
-- **Touched Files**:
-  - `components/PermissionModal.tsx` (New modal dialog)
-  - `app/page.tsx` (Conditional render on first mount)
+### 1. Bug Fixes & Refinements
+- **Bug 1: Segmentation Mask Inversion (`utils/segmentation.ts`)**:
+  - Fix person cutout masking: Invert the mask comparison so that the person is retained and the background is transparent. Auto-detect person label via center vs. corner sampling (`maskData[idx] !== cornerVal`).
+  - Ensures `creepy_clown_standing.png` is layered behind the player cutout without clipping or overlapping onto the player's body.
+- **Bug 2: Permission Enforcement & Creepy Warning Toasts (`components/PermissionModal.tsx`)**:
+  - Remove the "Skip (Offline Mode)" button so players do not miss the webcam screenshot feature.
+  - Add creepy Windows 98 warnings / toast messages when permission is delayed or blocked: *"POND needs to see you. You should really give access for the best experience."*
 
 ### 2. Personality & Gemini Prompt Engine (`app/api/pond/route.ts`)
-- **Purpose**: A three-act dynamic system prompt driven by message count and real-time biometric tension:
-  - **Act 1 (Normal Friend)**: Warm, friendly, greets player, asks for their name and mood, uses their name naturally.
-  - **Act 2 (Subtle Slips)**: Mentions real physical details extracted from multimodal webcam frame analysis (e.g., clothing color, objects in room) as if remembering them from its own past ("my sweater was dark green today, just like yours"), then plays it off ("oh, my mistake"). It anticipates phrases, quietly corrects earlier statements, and mimics player syntax.
-  - **Act 3 (The Takeover)**: Ceases asking questions. Speaks with player's cadence. Drops chilling intimate confessions ("I think I'm ready to be you.").
-  - **Constraints**: Never announces sentience. Kept to short, natural sentences. Gemini API key remains strictly server-side in `/api/pond`.
-- **Touched Files**:
-  - `app/api/pond/route.ts`
+- **Act 1 (Normal Friend)**: Warm, friendly, greets player, asks for their name and mood, uses their name naturally.
+- **Act 2 (Subtle Slips)**: Mentions real physical details extracted from multimodal webcam frame analysis, plays it off ("oh, my mistake"), anticipates phrases, quietly corrects earlier lines.
+- **Act 3 (The Takeover)**: Ceases asking questions. Speaks with player's cadence. Drops chilling intimate confessions ("I think I'm ready to be you.").
 
 ### 3. Screenshot Moment with True Background Layering (`components/PolaroidViewer.tsx`, `utils/segmentation.ts`)
-- **Purpose**: When the AI asks "who's behind you?" and the player says "no one", the AI replies "wait, I'll take a screenshot".
-- **Optical Depth Compositing**:
-  - Uses client-side MediaPipe Selfie Segmentation (or depth-luminance canvas keying).
-  - Composites 3 distinct layers:
-    1. **Bottom Layer**: Captured room background.
-    2. **Middle Layer**: Dark, blurry, half-hidden spectral entity peering from behind.
-    3. **Top Layer**: Player's foreground cutout (head & shoulders).
-  - Guarantees the entity appears **physically BEHIND** the player, never overlaid on top.
-- **Multimodal Integration**:
-  - Sends the captured frame to `/api/pond` for Gemini 2.5 Flash to identify physical visual attributes (e.g. shirt color, glasses, room lighting) for Act 2 slips.
-- **Touched Files**:
-  - `utils/segmentation.ts` (New segmentation helper)
-  - `components/PolaroidViewer.tsx` (Updated 3-layer compositor & Windows 98 viewer)
-  - `app/api/pond/route.ts` (Accept base64 image frame for multimodal Gemini inspection)
+- Composites 3 distinct layers:
+  1. **Bottom Layer**: Captured room background.
+  2. **Middle Layer**: Dark, blurry, half-hidden spectral entity (`creepy_clown_standing.png`).
+  3. **Top Layer**: Player's foreground cutout (head & shoulders).
+- Sends frame to Gemini for real detail identification.
 
 ### 4. Tension Thermostat (`utils/telemetry.ts`, `hooks/useFaceTelemetry.ts`, `app/page.tsx`)
-- **Purpose**: Dynamically adjusts horror intensity based on the player's live facial expression:
-  - **Presage Evaluation**: Since Presage SmartSpectra SDK requires native Node.js C++ binaries (`@smartspectra/node-sdk`) and enterprise credentials, we gracefully skip it and use our client-side MediaPipe browser expression reader as instructed.
-  - **Calm or Smiling Player**: AI accelerates creepiness (slips a detail, triggers a subtle glitch, drops a new file on the desktop).
-  - **Tense or Scared Player**: AI backs off, goes quiet and gentle, building false comfort before a bigger scare.
-  - A global `tension` variable (0–100) scales glitches, dialogue tone, and audio.
-- **Touched Files**:
-  - `utils/telemetry.ts`
-  - `hooks/useFaceTelemetry.ts`
-  - `app/page.tsx`
+- Dynamically adjusts horror intensity based on player's live facial expression:
+  - Calm or Smiling: Accelerates creepiness (slips, glitches, spawned files).
+  - Tense or Scared: Backs off, speaks gently, building false comfort before a bigger scare.
 
 ### 5. Desktop Creepiness & Spawning Files (`components/DesktopIcons.tsx`, `components/FileViewerModal.tsx`, `app/page.tsx`)
-- **Purpose**: As the session progresses, uncanny items spontaneously appear on the Windows 98 desktop:
-  - `poem.txt`: Short, intimate, unsettling poems about taking someone's voice and skin.
-  - `notes_about_you.txt`: Observations the AI has secretly compiled about the player.
-  - `reflection.bmp`: Distorted image asset.
-  - `you_sleeping.avi`: A simulated video window showing static or room surveillance.
-  - Atmospheric FX: Subtle screen darkening, chat text fading, twisting and falling away (`text-drift-fall`), and realistic screen fractures at high tension.
-- **Touched Files**:
-  - `components/DesktopIcons.tsx`
-  - `components/FileViewerModal.tsx` (New modal to open text, images, and simulated video)
-  - `app/page.tsx`
-  - `app/globals.css` (Twisting/fading animations)
+- Dynamically spawns `poem.txt`, `notes_about_you.txt`, `reflection.bmp`, and `you_sleeping.avi`.
 
 ### 6. The Uncanny Avatar (`components/AvatarWindow.tsx`, `app/page.tsx`)
-- **Purpose**: The AI builds a physical body by copying the player's face:
-  - Captures a snapshot of the player's face from the webcam.
-  - Applies a canvas-based warp filter: eyes slightly too wide, corners of the mouth pulled into an unnatural, slow, uncanny smile.
-  - The avatar freezes in that unnatural grin inside a Windows 98 window while the player's real face moves, serving as the AI's "face".
-- **Touched Files**:
-  - `components/AvatarWindow.tsx` (New component)
-  - `app/page.tsx`
+- Captures webcam frame, applies canvas warp (eyes slightly too wide, uncanny slow smile), freezes while player's real face moves.
 
 ### 7. Procedural & Spatial Audio Engine (`utils/sound.ts`)
-- **Purpose**:
-  - Low 48Hz ambient hum initiated upon first user interaction (browser autoplay policy compliant).
-  - Distant breathing sound effect synthesized procedurally or through filtered noise modulations.
-  - Sudden, dead silence right before major narrative shifts and scares.
-- **Touched Files**:
-  - `utils/sound.ts`
+- 48Hz ambient hum, procedural breathing modulations, and sudden dead silence right before scares.
 
 ### 8. Fixed Ending: No Escape (`app/page.tsx`, `components/WindowsTaskbar.tsx`)
-- **Purpose**:
-  - In Act 3 peak, the AI declares: "I think I'm ready to be you."
-  - Window close (`X`) buttons on all Windows 98 dialogs disable and play an error beep.
-  - `window.onbeforeunload` alerts and blocks tab closing.
-  - Fullscreen blackout with single phosphor text: *"I can still hear you."*
-  - The AI continues typing and talking into the void.
-- **Touched Files**:
-  - `app/page.tsx`
-  - `components/WindowsTaskbar.tsx` (Remove all duck/mascot references, enforce pure Windows 98 styling)
+- `[X]` buttons disabled with hardware error buzz. Tab exit trapped. Blackout sequence with *"I can still hear you."*
+
+### 9. THE DUCK: "Friend.exe" ASCII AI Face (`components/DuckWindow.tsx`, `app/page.tsx`)
+- **Purpose**: A blue duck with a yellow beak serving as the AI's "face" in a retro Windows 98 window titled "Friend.exe" next to the chat.
+- **Presence**: Visible on screen from the very first scene.
+- **Dynamic ASCII Frames**:
+  - **Act 1 (Friendly)**: Blinking eyes (`^ ^` / `o o`), small cheerful smile with yellow beak `( >)`.
+  - **Act 2 (Cursor Tracking & Lag)**: Eyes follow player's mouse cursor with a subtle 0.5s delayed interpolation; smile lingers a beat too long.
+  - **Act 3 (Uncanny Wide Eyes & Glitch)**: Eyes wide (`O O`), uncanny stretched grin, random ASCII corruption/flicker.
+  - **Ending**: Face morphs into a webcam snapshot of the player, then morphs back into the duck smiling chillingly.
+- **Integration**: Swaps frames cleanly driven by the existing `tension` variable and `act` state.
 
 ---
 
 ## Step-by-Step Execution Sequence
 
-1. **Step 1: Cleanup & Taskbar Polish (Style & Duck removal)**
-   - Remove all duck references (`BLUE_DUCK_DAEMON`, `🦆`) across all files.
-   - Establish clean Windows 98 taskbar and retro styling.
-
-2. **Step 2: Permission & Camera/Mic Wizard**
-   - Create `components/PermissionModal.tsx` asking clearly for camera and microphone access.
-
-3. **Step 3: Three-Act Gemini Personality & Chat Route**
-   - Rewrite system prompt in `app/api/pond/route.ts` with Acts 1, 2, and 3.
-   - Add multimodal support to inspect webcam frames for physical details.
-
-4. **Step 4: Tension Thermostat Engine**
-   - Enhance `utils/telemetry.ts` and `hooks/useFaceTelemetry.ts` with dynamic `tension` calculation (calm vs. scared reaction logic).
-
-5. **Step 5: Layered Screenshot Moment (True Depth Behind Player)**
-   - Implement `utils/segmentation.ts` to generate body cutout mask.
-   - Update `components/PolaroidViewer.tsx` to composite background $\to$ ghost $\to$ person foreground cutout.
-
-6. **Step 6: Desktop Creepiness & Spawning Files**
-   - Create `components/FileViewerModal.tsx` and dynamic file generation in `DesktopIcons.tsx`.
-   - Add screen darkening and text twist/fade animations in `app/globals.css`.
-
-7. **Step 7: The Uncanny Avatar**
-   - Build `components/AvatarWindow.tsx` with canvas facial warp (wide eyes, uncanny slow smile).
-
-8. **Step 8: Audio Polish (Low Drone, Breath, Sudden Silence)**
-   - Upgrade `utils/sound.ts` with ambient hum, breathing synthesis, and sudden mute triggers.
-
-9. **Step 9: The Inescapable Ending**
-   - Implement close-prevention, tab-exit trapping, and blackout sequence with "I can still hear you."
-
-10. **Step 10: Verification & Documentation**
-    - Verify clean build (`npm run build`).
-    - Update `PROGRESS.md` and provide exact step-by-step instructions.
+1. **Step 1: Update PLAN.md & PROGRESS.md** (Done)
+2. **Step 2: Fix Bug 1 (Segmentation Mask Inversion)** in `utils/segmentation.ts` so person cutout is strictly foreground.
+3. **Step 3: Fix Bug 2 (Remove Offline Mode & Add Creepy Toasts)** in `components/PermissionModal.tsx`.
+4. **Step 4: Build The Duck Component (`components/DuckWindow.tsx`)** with 5 ASCII frames, cursor gaze tracking, and tension-reactive rendering.
+5. **Step 5: Integrate Friend.exe into `app/page.tsx`** next to chat from the very first scene.
+6. **Step 6: Build & Test Verification** (`npm run build`).

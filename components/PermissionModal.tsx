@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { Camera, Mic, ShieldAlert, Cpu, ArrowRight } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Camera, Mic, ShieldAlert, Cpu, ArrowRight, Eye } from "lucide-react";
 
 interface PermissionModalProps {
   onPermissionsGranted: (stream: MediaStream | null) => void;
@@ -12,6 +12,24 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
 }) => {
   const [requesting, setRequesting] = useState(false);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
+  const [creepyToastIndex, setCreepyToastIndex] = useState(0);
+
+  const creepyToasts = [
+    "you should really give access for best experience.",
+    "pond needs to see who it is speaking to.",
+    "it is dark in here without your camera.",
+    "do not be afraid. grant video authorization.",
+    "a connection cannot form in the dark.",
+    "i want to see your room. click allow.",
+  ];
+
+  // Subtle cycling creepy toast messages to urge the player
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCreepyToastIndex((prev) => (prev + 1) % creepyToasts.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [creepyToasts.length]);
 
   const requestHardwareAccess = async () => {
     setRequesting(true);
@@ -22,7 +40,7 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
         throw new Error("Hardware access not supported by browser.");
       }
 
-      // Request both camera and microphone as requested
+      // Request both camera and microphone
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 640 },
@@ -34,8 +52,8 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
 
       onPermissionsGranted(stream);
     } catch (err: any) {
-      console.warn("Camera/Mic permission prompt error:", err);
-      // If audio fails (e.g. mic disabled on Mac), try video only
+      console.warn("Camera/Mic permission prompt note:", err);
+      // If audio fails (e.g. mic permission denied), attempt video only
       try {
         const videoOnlyStream = await navigator.mediaDevices.getUserMedia({
           video: {
@@ -48,25 +66,21 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
         onPermissionsGranted(videoOnlyStream);
       } catch (videoErr) {
         setErrorNotice(
-          "Camera/Mic permission was not granted. You may proceed in fallback mode or check browser permissions."
+          "Camera authorization was not granted. POND cannot see your physical room. Please allow camera access in your browser address bar to continue."
         );
         setRequesting(false);
       }
     }
   };
 
-  const handleSimulate = () => {
-    onPermissionsGranted(null);
-  };
-
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-[3px] p-4 select-none">
-      <div className="win98-bevel-out bg-[#c0c0c0] w-full max-w-[490px] shadow-2xl p-1 text-black font-sans">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-[3px] p-4 select-none">
+      <div className="win98-bevel-out bg-[#c0c0c0] w-full max-w-[500px] shadow-2xl p-1 text-black font-sans animate-fadeIn">
         {/* Title Bar */}
         <div className="win98-titlebar flex items-center justify-between px-2.5 py-1">
           <div className="flex items-center gap-1.5 text-xs text-white font-bold">
             <Cpu className="w-3.5 h-3.5" />
-            <span>POND Hardware Setup Wizard - Audio/Video Configuration</span>
+            <span>POND Hardware Setup Wizard - Audio/Video Authorization</span>
           </div>
         </div>
 
@@ -98,12 +112,20 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
               <p className="text-neutral-700 text-[11px]">
                 To experience &ldquo;Still Here?&rdquo;, POND needs access to your <strong>webcam</strong>{" "}
                 and <strong>microphone</strong>. Your video stream is analyzed locally in your browser for
-                facial affect and gaze tracking.
+                surveillance snapshots and facial affect tracking.
               </p>
               <p className="text-neutral-600 text-[10px] italic">
-                * No video recordings leave your computer. Processing runs client-side.
+                * All computer vision processing runs strictly inside your local browser.
               </p>
             </div>
+          </div>
+
+          {/* Creepy Windows 98 Toast Alert */}
+          <div className="win98-bevel-in bg-neutral-900 text-emerald-400 p-2.5 flex items-center gap-2 font-mono text-[11px] border border-neutral-700 shadow-inner">
+            <Eye className="w-4 h-4 text-emerald-400 shrink-0 animate-pulse" />
+            <span className="italic tracking-wide">
+              &ldquo;{creepyToasts[creepyToastIndex]}&rdquo;
+            </span>
           </div>
 
           {errorNotice && (
@@ -116,37 +138,32 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
           <div className="win98-bevel-in bg-white p-2.5 text-[11px] font-mono text-neutral-800 space-y-1">
             <div className="flex items-center justify-between">
               <span>DEVICE [0]: Video Input (User Cam)</span>
-              <span className="text-blue-800 font-bold">[READY]</span>
+              <span className="text-blue-800 font-bold">[REQUIRED]</span>
             </div>
             <div className="flex items-center justify-between">
               <span>DEVICE [1]: Audio Input (Microphone)</span>
-              <span className="text-blue-800 font-bold">[READY]</span>
+              <span className="text-blue-800 font-bold">[REQUIRED]</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>STATUS: Awaiting User Authorization</span>
-              <span className="text-amber-800 font-bold animate-pulse">[PENDING]</span>
+              <span>STATUS: Awaiting Device Authorization</span>
+              <span className="text-amber-800 font-bold animate-pulse">[ACTION REQUIRED]</span>
             </div>
           </div>
         </div>
 
         {/* Wizard Footer Controls */}
         <div className="p-2.5 border-t border-neutral-400 bg-[#c0c0c0] flex items-center justify-between">
+          <span className="text-[10px] text-neutral-600 font-mono">
+            * CAMERA ACCESS REQUIRED FOR EXPERIENCE
+          </span>
           <button
-            onClick={handleSimulate}
-            className="win98-bevel-button px-3 py-1.5 text-xs text-neutral-700 hover:text-black"
+            onClick={requestHardwareAccess}
+            disabled={requesting}
+            className="win98-bevel-button px-5 py-2 text-xs font-bold text-black flex items-center gap-1.5 bg-neutral-200 hover:bg-neutral-100"
           >
-            Skip (Offline Mode)
+            <span>{requesting ? "Authorizing..." : "Allow Camera & Mic [Next >]"}</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={requestHardwareAccess}
-              disabled={requesting}
-              className="win98-bevel-button px-4 py-1.5 text-xs font-bold text-black flex items-center gap-1.5 bg-neutral-200"
-            >
-              <span>{requesting ? "Connecting..." : "Allow Camera & Mic"}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
         </div>
       </div>
     </div>
