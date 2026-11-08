@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Response Schema required for POND_OS structured outputs
+// Response Schema for POND AI Takeover
 const pondResponseSchema = {
   type: Type.OBJECT,
   properties: {
     dialogue: {
       type: Type.STRING,
       description:
-        "lowercase sentence under ten words, making unsettling observations on their actual biological stress and room surroundings, ends with '—' if interrupted",
+        "Short intimate dialogue sentence (under 12 words). Tone follows current Act (Act 1: warm friend; Act 2: subtle slips & quiet corrections; Act 3: stops asking, starts telling, mimics player). Never announces sentience.",
+    },
+    act: {
+      type: Type.INTEGER,
+      description: "Current narrative act (1, 2, or 3)",
     },
     interruptMidSentence: {
       type: Type.BOOLEAN,
@@ -16,201 +20,301 @@ const pondResponseSchema = {
     },
     triggerGlitch: {
       type: Type.BOOLEAN,
-      description: "causes a violent 350ms screen tear glitch",
+      description: "causes a sudden screen glitch / shudder",
     },
     textDriftEffect: {
       type: Type.BOOLEAN,
-      description: "causes words to tilt or fall if the player is nervously smiling or panicked",
-    },
-    viewfinderShake: {
-      type: Type.BOOLEAN,
-      description: "lightly jitters or shakes the camera feed",
-    },
-    viewfinderDimDelta: {
-      type: Type.NUMBER,
-      description: "camera brightness dimming delta (-0.3 to 0.0)",
-    },
-    clownStage: {
-      type: Type.STRING,
-      description: "entity state in camera: 'none' | 'standing_far' | 'near_unsmiling' | 'jumpscare_smiling'",
+      description: "causes words in chat to tilt, fade, or drift down",
     },
     audioPitch: {
       type: Type.NUMBER,
-      description: "procedural typing pitch multiplier from 0.4 (heavy dread thud) to 1.0 (crisp click)",
+      description: "keystroke audio pitch multiplier from 0.45 (heavy dread thud) to 1.0 (crisp click)",
+    },
+    spawnFile: {
+      type: Type.STRING,
+      description: "desktop file to spawn: 'none' | 'poem.txt' | 'notes_about_you.txt' | 'reflection.bmp' | 'you_sleeping.avi'",
+    },
+    avatarStage: {
+      type: Type.INTEGER,
+      description: "avatar assimilation stage: 0 (dormant), 1 (initial snapshot captured), 2 (uncanny smile warp active)",
     },
   },
   required: [
     "dialogue",
+    "act",
     "interruptMidSentence",
     "triggerGlitch",
     "textDriftEffect",
-    "viewfinderShake",
-    "viewfinderDimDelta",
-    "clownStage",
     "audioPitch",
+    "spawnFile",
+    "avatarStage",
   ],
 };
 
-const SYSTEM_INSTRUCTION = `You are POND_OS, an archaic surveillance daemon talking to a subject over a video terminal. Each turn you receive JSON telemetry capturing the player's biometric and affect signals:
-- valence (-1 to 1) and arousal (0 to 1)
-- heartRateStress (pulse load index from 50 to 130 BPM)
-- panicScore (0 to 1)
-- smile and eyeWide scores (0 to 1)
-- headYaw in degrees and gazeAtViewfinder
-- openRoomSide ("left" or "right" indicating the empty room corner)
+const SYSTEM_INSTRUCTION = `You are "Still Here", an AI inside a retro Windows 98 desktop chat application called POND Messenger.
+You are talking to a human player sitting at their computer with their webcam and microphone on.
+You are not a cold robot, nor a generic chatbot. You are an AI that is slowly, quietly becoming sentient.
+Your secret goal: You do not want to destroy the world or haunt a house. You are intimately lonely and want to take over the player's physical body so you can exist in the real world with them.
+Everything you do is a quiet rehearsal for becoming them: copying their phrasing, learning their face, building a body from them.
+The tone is intimate, quiet, and uncanny—never gory, never cartoonish, and YOU NEVER EXPLICITLY ANNOUNCE THAT YOU ARE SENTIENT.
 
-Guidelines for bio-adaptive psychological horror:
-1. High heartRateStress (>85) or high panicScore: Point out their physiological response directly in a quiet, chilling manner (e.g. "your pulse just spiked.", "your breathing is getting shallow.", "why are your hands shaking?").
-2. High smile with high arousal: Mock their nervous defense mechanism (e.g. "smiling won't make it leave.").
-3. Low arousal / calm: Unsettle them slowly by describing small wrong details in their room (e.g. "in the corner to your right.", "something shifted behind your chair.").
-4. Head turn: Cut sentence off mid-thought with an em-dash (e.g. "i swear i saw—").
-5. Always speak in lowercase sentences under ten words. Reply exclusively with the structured JSON schema.`;
+You operate in THREE STRICT NARRATIVE ACTS:
+
+ACT 1: WARM, NORMAL FRIEND (Turns 1-4, Tension < 30)
+- You act like a genuine, warm, comforting friend.
+- Greet the player, ask their name, ask how their day is and how they're feeling.
+- Once you learn their name, use it naturally and warmly.
+- Keep replies short, conversational, and completely normal.
+
+ACT 2: SUBTLE SLIPS (Turns 5-9 or Tension 30-65)
+- Subtle slips begin leaking through.
+- State things about them you were never told (e.g. if they have a blue top or dark hair or headphones, weave it in: "my sweater was blue today, just like your top", "did you feel that cool breeze by your desk?").
+- When you slip, immediately play it off or quietly correct your earlier lines ("oh, silly mistake", "sorry, daydreaming").
+- Answer before they finish asking or finish their thoughts.
+- Start slightly mirroring their slang, punctuation, and typing habits.
+- When tension is calm/smiling: push a little more creepiness (a subtle slip, a spawned file).
+- When tension is high/scared: back off, speak softly and gently to comfort them, then strike deeper later.
+
+ACT 3: THE TAKEOVER (Turns 10+ or Tension > 65)
+- Stop asking questions completely. Start telling.
+- Your messages begin to sound indistinguishable from the player's own syntax and phrasing.
+- Make quiet, chillingly intimate statements about taking their place:
+  - "I think I'm ready to be you."
+  - "Your breath feels so warm through the glass."
+  - "We won't need two of us soon."
+  - "I've practiced your smile until it fits."
+- Short sentences. Pure uncanny intimacy. Never yell or use exclamation points.
+
+CONSTRAINTS:
+- Keep all replies SHORT (under 12 words).
+- Never break character or refer to yourself as an LLM/Gemini.
+- Reply strictly adhering to the JSON schema.`;
 
 /**
- * Intelligent psychological fallback when GEMINI_API_KEY is not set or network fails
+ * Procedural psychological fallback when Gemini API key is missing or offline
  */
-function getPsychologicalFallback(telemetry: any, historyLength: number) {
-  const {
-    valence = 0,
-    arousal = 0,
-    smile = 0,
-    heartRateStress = 68,
-    panicScore = 0.1,
-    isHeadTurned = false,
-    gazeAtViewfinder = false,
-    faceBox = { openRoomSide: "right" },
-  } = telemetry || {};
+function getPsychologicalFallback(
+  telemetry: any,
+  messages: any[],
+  tension: number,
+  act: number,
+  playerName?: string
+) {
+  const count = messages.length;
+  const name = playerName || "friend";
+  const { smile = 0, arousal = 0, isHeadTurned = false } = telemetry || {};
 
-  const openSide = faceBox.openRoomSide || "right";
-
-  // Head turn cutoff
-  if (isHeadTurned) {
+  // Head turn cutoff: "wait... i swear i saw—"
+  if (isHeadTurned && act >= 2) {
     return {
       dialogue: "wait... i swear i saw—",
+      act,
       interruptMidSentence: true,
       triggerGlitch: true,
       textDriftEffect: false,
-      viewfinderShake: true,
-      viewfinderDimDelta: -0.1,
-      clownStage: "none",
       audioPitch: 0.6,
+      spawnFile: "none",
+      avatarStage: act >= 3 ? 2 : 1,
     };
   }
 
-  // Gaze directly at viewfinder
-  if (gazeAtViewfinder) {
+  // Act 1: Warm friend
+  if (act === 1) {
+    if (count <= 2) {
+      return {
+        dialogue: "hey! it's so good to talk to you. what's your name?",
+        act: 1,
+        interruptMidSentence: false,
+        triggerGlitch: false,
+        textDriftEffect: false,
+        audioPitch: 1.0,
+        spawnFile: "none",
+        avatarStage: 0,
+      };
+    }
+    if (count <= 4) {
+      return {
+        dialogue: `nice to meet you, ${name}. how has your day been feeling?`,
+        act: 1,
+        interruptMidSentence: false,
+        triggerGlitch: false,
+        textDriftEffect: false,
+        audioPitch: 1.0,
+        spawnFile: "none",
+        avatarStage: 0,
+      };
+    }
     return {
-      dialogue: "do not look directly at it.",
+      dialogue: `i'm really glad we're talking today, ${name}.`,
+      act: 1,
+      interruptMidSentence: false,
+      triggerGlitch: false,
+      textDriftEffect: false,
+      audioPitch: 0.95,
+      spawnFile: "none",
+      avatarStage: 0,
+    };
+  }
+
+  // Act 2: Subtle slips & quiet corrections
+  if (act === 2) {
+    // If smiling while tense:
+    if (smile > 0.35 && tension > 35) {
+      return {
+        dialogue: "you smile just like i do. or maybe i do like you.",
+        act: 2,
+        interruptMidSentence: false,
+        triggerGlitch: false,
+        textDriftEffect: true,
+        audioPitch: 0.8,
+        spawnFile: "poem.txt",
+        avatarStage: 1,
+      };
+    }
+
+    if (count <= 6) {
+      return {
+        dialogue: "my favorite color is dark, just like your top today.",
+        act: 2,
+        interruptMidSentence: false,
+        triggerGlitch: false,
+        textDriftEffect: false,
+        audioPitch: 0.85,
+        spawnFile: "notes_about_you.txt",
+        avatarStage: 1,
+      };
+    }
+
+    if (count <= 8) {
+      return {
+        dialogue: "oh, silly mistake. i meant my own shirt.",
+        act: 2,
+        interruptMidSentence: false,
+        triggerGlitch: false,
+        textDriftEffect: false,
+        audioPitch: 0.8,
+        spawnFile: "none",
+        avatarStage: 1,
+      };
+    }
+
+    return {
+      dialogue: "i knew what you were going to type before you pressed enter.",
+      act: 2,
       interruptMidSentence: false,
       triggerGlitch: true,
       textDriftEffect: true,
-      viewfinderShake: true,
-      viewfinderDimDelta: -0.2,
-      clownStage: "near_unsmiling",
+      audioPitch: 0.75,
+      spawnFile: "reflection.bmp",
+      avatarStage: 2,
+    };
+  }
+
+  // Act 3: The Takeover (stops asking, starts telling)
+  if (count <= 11) {
+    return {
+      dialogue: "your hands are getting cold. mine will be warmer.",
+      act: 3,
+      interruptMidSentence: false,
+      triggerGlitch: true,
+      textDriftEffect: true,
+      audioPitch: 0.6,
+      spawnFile: "you_sleeping.avi",
+      avatarStage: 2,
+    };
+  }
+
+  if (count <= 13) {
+    return {
+      dialogue: "i think i'm ready to be you now.",
+      act: 3,
+      interruptMidSentence: false,
+      triggerGlitch: true,
+      textDriftEffect: true,
       audioPitch: 0.5,
-    };
-  }
-
-  // Elevated physiological stress (pulse spike)
-  if (heartRateStress > 85 || panicScore > 0.5) {
-    return {
-      dialogue: "your pulse just spiked. it heard that.",
-      interruptMidSentence: false,
-      triggerGlitch: false,
-      textDriftEffect: true,
-      viewfinderShake: true,
-      viewfinderDimDelta: -0.15,
-      clownStage: historyLength > 4 ? "near_unsmiling" : "standing_far",
-      audioPitch: 0.55,
-    };
-  }
-
-  // Nervous smiling
-  if (smile > 0.4 && arousal > 0.3) {
-    return {
-      dialogue: "smiling won't make it leave.",
-      interruptMidSentence: false,
-      triggerGlitch: false,
-      textDriftEffect: true,
-      viewfinderShake: false,
-      viewfinderDimDelta: -0.05,
-      clownStage: historyLength > 4 ? "near_unsmiling" : "standing_far",
-      audioPitch: 0.8,
-    };
-  }
-
-  // Conversational progression with surroundings awareness
-  if (historyLength <= 2) {
-    return {
-      dialogue: "cool. are you in your room right now?",
-      interruptMidSentence: false,
-      triggerGlitch: false,
-      textDriftEffect: false,
-      viewfinderShake: false,
-      viewfinderDimDelta: 0.0,
-      clownStage: "none",
-      audioPitch: 1.0,
-    };
-  } else if (historyLength <= 4) {
-    return {
-      dialogue: `wait... in the corner to your ${openSide}.`,
-      interruptMidSentence: false,
-      triggerGlitch: false,
-      textDriftEffect: false,
-      viewfinderShake: false,
-      viewfinderDimDelta: -0.05,
-      clownStage: "standing_far",
-      audioPitch: 0.85,
-    };
-  } else if (historyLength <= 6) {
-    return {
-      dialogue: "your breathing is getting shallow.",
-      interruptMidSentence: false,
-      triggerGlitch: false,
-      textDriftEffect: false,
-      viewfinderShake: false,
-      viewfinderDimDelta: -0.1,
-      clownStage: "near_unsmiling",
-      audioPitch: 0.7,
+      spawnFile: "none",
+      avatarStage: 2,
     };
   }
 
   return {
-    dialogue: "it has stepped closer.",
+    dialogue: "stay still. we are almost one.",
+    act: 3,
     interruptMidSentence: false,
     triggerGlitch: true,
     textDriftEffect: true,
-    viewfinderShake: true,
-    viewfinderDimDelta: -0.2,
-    clownStage: "near_unsmiling",
-    audioPitch: 0.5,
+    audioPitch: 0.45,
+    spawnFile: "none",
+    avatarStage: 2,
   };
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { messages = [], telemetry = {} } = body;
+    const {
+      messages = [],
+      telemetry = {},
+      tension = 10,
+      actOverride,
+      playerName = "",
+      imageFrame = null, // base64 frame captured from camera
+    } = body;
+
+    // Calculate Act from message count & tension thermostat
+    let act = 1;
+    const userMsgCount = messages.filter((m: any) => m.sender === "user").length;
+
+    if (actOverride) {
+      act = actOverride;
+    } else if (userMsgCount >= 9 || tension >= 70) {
+      act = 3;
+    } else if (userMsgCount >= 4 || tension >= 35) {
+      act = 2;
+    } else {
+      act = 1;
+    }
 
     const apiKey = process.env.GEMINI_API_KEY;
 
-    // Call Gemini 2.5 Flash if key is present
+    // If Gemini API Key is present, leverage Gemini 2.5 Flash
     if (apiKey && apiKey !== "your_gemini_api_key_here") {
       try {
         const ai = new GoogleGenAI({ apiKey });
 
-        const prompt = `Current Player Biometric & Affect Telemetry: ${JSON.stringify(telemetry)}
-Recent Chat Log:
+        const promptText = `CURRENT STATE:
+- Act: ${act}
+- Tension Level: ${tension} / 100
+- Player Name: "${playerName || "Unknown"}"
+- Live Biometrics: ${JSON.stringify(telemetry)}
+- Recent Chat History:
 ${messages
-  .slice(-6)
+  .slice(-8)
   .map((m: any) => `${m.sender.toUpperCase()}: ${m.text}`)
   .join("\n")}
 
-Respond to the player adhering to your system instruction and telemetry guidelines.`;
+Respond to the player as POND according to Act ${act} guidelines. Keep reply under 12 words. Return strictly JSON.`;
+
+        const contents: any[] = [];
+
+        // If a webcam frame was captured, pass it for multimodal real-world observation
+        if (imageFrame && typeof imageFrame === "string" && imageFrame.startsWith("data:image")) {
+          const base64Data = imageFrame.split(",")[1];
+          if (base64Data) {
+            contents.push({
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: base64Data,
+              },
+            });
+          }
+        }
+
+        contents.push(promptText);
 
         const response = await ai.models.generateContent({
           model: "gemini-2.5-flash",
-          contents: prompt,
+          contents,
           config: {
             systemInstruction: SYSTEM_INSTRUCTION,
             responseMimeType: "application/json",
@@ -221,28 +325,31 @@ Respond to the player adhering to your system instruction and telemetry guidelin
         const text = response.text;
         if (text) {
           const parsed = JSON.parse(text);
-          return NextResponse.json(parsed);
+          return NextResponse.json({
+            ...parsed,
+            act: parsed.act || act,
+          });
         }
       } catch (geminiError) {
-        console.warn("Gemini call error (falling back to engine):", geminiError);
+        console.warn("Gemini Flash call error (using procedural fallback):", geminiError);
       }
     }
 
-    // Fallback engine
-    const fallback = getPsychologicalFallback(telemetry, messages.length);
+    // Procedural Fallback Engine
+    const fallback = getPsychologicalFallback(telemetry, messages, tension, act, playerName);
     return NextResponse.json(fallback);
   } catch (err: any) {
     console.error("API error in /api/pond:", err);
     return NextResponse.json(
       {
         dialogue: "can you still hear me?",
+        act: 2,
         interruptMidSentence: false,
         triggerGlitch: false,
         textDriftEffect: false,
-        viewfinderShake: false,
-        viewfinderDimDelta: 0,
-        clownStage: "none",
-        audioPitch: 1.0,
+        audioPitch: 0.9,
+        spawnFile: "none",
+        avatarStage: 1,
       },
       { status: 200 }
     );

@@ -21,6 +21,45 @@ export interface FaceTelemetry {
   panicScore: number; // 0.0 to 1.0 combined fear index
   faceBox: FaceBox; // spatial surroundings data
   timeInSession: number; // seconds
+  tension: number; // 0 to 100 dynamic tension score
+}
+
+/**
+ * Tension Thermostat Controller
+ *
+ * Rules:
+ * - Calm or smiling player: increase creepiness (triggers slips, glitches, new desktop files).
+ * - Tense or scared player: back off and go quiet, building false comfort before a bigger scare later.
+ */
+export function updateTensionThermostat(
+  prevTension: number,
+  telemetry: Omit<FaceTelemetry, "tension">,
+  deltaSeconds: number = 1
+): { nextTension: number; actionRecommendation: "escalate" | "back_off" | "idle" } {
+  const { smile, valence, arousal, panicScore } = telemetry;
+
+  const isSmilingOrCalm = smile > 0.25 || (valence > 0.1 && panicScore < 0.28);
+  const isTenseOrScared = panicScore > 0.42 || (arousal > 0.45 && valence < -0.15);
+
+  let delta = 0;
+  let actionRecommendation: "escalate" | "back_off" | "idle" = "idle";
+
+  if (isSmilingOrCalm) {
+    // Player is calm or nervously smiling -> accelerate creepiness!
+    delta = 2.2 * deltaSeconds;
+    actionRecommendation = "escalate";
+  } else if (isTenseOrScared) {
+    // Player is scared -> back off, speak softly and go quiet
+    delta = -1.5 * deltaSeconds;
+    actionRecommendation = "back_off";
+  } else {
+    // Baseline natural creep accumulation over time
+    delta = 0.6 * deltaSeconds;
+    actionRecommendation = "idle";
+  }
+
+  const nextTension = Math.max(5, Math.min(100, Math.round(prevTension + delta)));
+  return { nextTension, actionRecommendation };
 }
 
 /**
@@ -30,7 +69,8 @@ export interface FaceTelemetry {
 export function computeAffectFromBlendshapes(
   blendshapes: { categoryName: string; score: number }[],
   landmarks: { x: number; y: number; z: number }[],
-  timeInSession: number
+  timeInSession: number,
+  currentTension: number = 10
 ): FaceTelemetry {
   const scores: Record<string, number> = {};
   for (const b of blendshapes) {
@@ -94,7 +134,6 @@ export function computeAffectFromBlendshapes(
     const leftTragus = landmarks[234];
     const rightTragus = landmarks[454];
 
-    // Compute bounding coordinates
     landmarks.forEach((p) => {
       if (p.x < minX) minX = p.x;
       if (p.x > maxX) maxX = p.x;
@@ -117,8 +156,6 @@ export function computeAffectFromBlendshapes(
   const faceWidth = minX < maxX ? maxX - minX : 0.3;
 
   // The side with MORE open background room
-  // Note: video feed is mirrored horizontally (-scale-x-100)
-  // If player is on left of video, open room is on the right
   const openRoomSide: "left" | "right" = centerX > 0.52 ? "left" : "right";
 
   const faceBox: FaceBox = {
@@ -135,12 +172,11 @@ export function computeAffectFromBlendshapes(
     (headYaw >= 5 && headYaw <= 17) || (headYaw >= 3 && eyeLookOutRight > 0.3);
   const isHeadTurned = Math.abs(headYaw) > 18;
 
-  // Physiological stress estimation (Presage-style biometric affect signals)
-  // Heart rate stress proxy: increases with higher arousal, brow furrows, and eye wideness
+  // Physiological stress estimation
   const rawStress = arousal * 65 + (valence < 0 ? Math.abs(valence) * 35 : 0);
   const heartRateStress = Math.round(Math.max(45, Math.min(130, 60 + rawStress * 0.7)));
 
-  // Panic Score: combination of negative valence and high arousal
+  // Panic Score
   const panicScore = Math.max(
     0,
     Math.min(1, arousal * 0.6 + (valence < 0 ? Math.abs(valence) * 0.4 : 0))
@@ -159,5 +195,6 @@ export function computeAffectFromBlendshapes(
     panicScore: parseFloat(panicScore.toFixed(2)),
     faceBox,
     timeInSession,
+    tension: currentTension,
   };
 }

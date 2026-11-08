@@ -6,6 +6,7 @@ import { FaceTelemetry, computeAffectFromBlendshapes } from "@/utils/telemetry";
 interface UseFaceTelemetryOptions {
   videoRef: React.RefObject<HTMLVideoElement>;
   enabled?: boolean;
+  currentTension?: number;
   onHeadTurn?: (yaw: number) => void;
   onViewfinderGaze?: () => void;
 }
@@ -13,6 +14,7 @@ interface UseFaceTelemetryOptions {
 export function useFaceTelemetry({
   videoRef,
   enabled = true,
+  currentTension = 10,
   onHeadTurn,
   onViewfinderGaze,
 }: UseFaceTelemetryOptions) {
@@ -34,6 +36,7 @@ export function useFaceTelemetry({
       openRoomSide: "right",
     },
     timeInSession: 0,
+    tension: currentTension,
   });
 
   const [isModelReady, setIsModelReady] = useState(false);
@@ -45,11 +48,13 @@ export function useFaceTelemetry({
 
   const onHeadTurnRef = useRef(onHeadTurn);
   const onViewfinderGazeRef = useRef(onViewfinderGaze);
+  const currentTensionRef = useRef(currentTension);
 
   useEffect(() => {
     onHeadTurnRef.current = onHeadTurn;
     onViewfinderGazeRef.current = onViewfinderGaze;
-  }, [onHeadTurn, onViewfinderGaze]);
+    currentTensionRef.current = currentTension;
+  }, [onHeadTurn, onViewfinderGaze, currentTension]);
 
   // Load MediaPipe FaceLandmarker
   useEffect(() => {
@@ -134,7 +139,8 @@ export function useFaceTelemetry({
               const currentTelemetry = computeAffectFromBlendshapes(
                 blendshapes,
                 landmarks,
-                sessionElapsed
+                sessionElapsed,
+                currentTensionRef.current
               );
 
               setTelemetry(currentTelemetry);
@@ -164,6 +170,7 @@ export function useFaceTelemetry({
               setTelemetry((prev) => ({
                 ...prev,
                 timeInSession: sessionElapsed,
+                tension: currentTensionRef.current,
               }));
             }
           } catch (e) {

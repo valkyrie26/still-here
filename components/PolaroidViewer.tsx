@@ -1,114 +1,76 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { X, Minus, Square, Image as ImageIcon, RefreshCw, ZoomIn, Printer } from "lucide-react";
 import { FaceBox } from "@/utils/telemetry";
+import { compositeLayeredScreenshot } from "@/utils/segmentation";
 
 interface PhotoViewerProps {
   isOpen: boolean;
   onClose: () => void;
   videoRef: React.RefObject<HTMLVideoElement>;
   faceBox?: FaceBox;
+  onPhotoCaptured?: (dataUrl: string) => void;
 }
 
 /**
  * Clean Windows 98 Photo Viewer ("Imaging for Windows")
- * Captures player's frame and composites creepy_clown_standing standing
- * from the bottom of the frame behind the player like a full-bodied ghost.
+ * Composites 3 Layers:
+ * 1. Background room
+ * 2. Ghost entity (creepy_clown_standing, dark, blurry, half-hidden, grounded from bottom)
+ * 3. Person Cutout strictly ON TOP so ghost is physically BEHIND player.
  */
 export const PolaroidViewer: React.FC<PhotoViewerProps> = ({
   isOpen,
   onClose,
   videoRef,
   faceBox,
+  onPhotoCaptured,
 }) => {
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [timestamp, setTimestamp] = useState<string>("");
   const [developing, setDeveloping] = useState(true);
+  const clownImageRef = useRef<HTMLImageElement | null>(null);
 
-  const captureAndRenderScreenshot = () => {
+  // Preload clown standing image
+  useEffect(() => {
+    const img = new Image();
+    img.src = "/images/creepy_clown_standing.png";
+    clownImageRef.current = img;
+  }, []);
+
+  const captureAndRenderScreenshot = async () => {
     const video = videoRef.current;
     if (!video || video.readyState < 2) return;
 
     setDeveloping(true);
 
-    const canvas = document.createElement("canvas");
-    canvas.width = 640;
-    canvas.height = 480;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    try {
+      let clownImg = clownImageRef.current;
+      if (!clownImg || !clownImg.complete) {
+        clownImg = new Image();
+        clownImg.src = "/images/creepy_clown_standing.png";
+        await new Promise((resolve) => {
+          clownImg!.onload = resolve;
+          clownImg!.onerror = resolve;
+        });
+      }
 
-    // 1. Draw player's webcam frame (mirrored)
-    ctx.save();
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    ctx.restore();
-
-    // 2. Vintage camera grading
-    ctx.fillStyle = "rgba(10, 20, 15, 0.08)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // 3. Composite creepy_clown_standing standing from bottom of frame
-    const clownImg = new Image();
-    clownImg.src = "/images/creepy_clown_standing.png";
-
-    clownImg.onload = () => {
-      ctx.save();
-
-      const openSide = faceBox?.openRoomSide || "right";
-
-      // Height: stands tall from the bottom of the frame (approx 85% of frame height)
-      const clownH = Math.round(canvas.height * 0.88);
-      const clownW = clownH; // 350x350 square image
-
-      // Y position: grounded directly at the bottom edge of the frame
-      const clownY = canvas.height - clownH;
-
-      // X position: standing in the room behind the user's shoulder
-      const clownX =
-        openSide === "right"
-          ? canvas.width - clownW + 35
-          : -35;
-
-      // Floor shadow under clown's feet
-      ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
-      ctx.beginPath();
-      ctx.ellipse(clownX + clownW / 2, canvas.height - 12, clownW * 0.32, 16, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Faded ghostly opacity (~82%) with slight soft edge
-      ctx.globalAlpha = 0.82;
-      ctx.filter = "contrast(1.15) brightness(0.88)";
-      ctx.drawImage(clownImg, clownX, clownY, clownW, clownH);
-      ctx.restore();
-
-      // 4. Subtle camera vignette
-      const vignette = ctx.createRadialGradient(
-        canvas.width / 2,
-        canvas.height / 2,
-        canvas.width * 0.35,
-        canvas.width / 2,
-        canvas.height / 2,
-        canvas.width * 0.75
-      );
-      vignette.addColorStop(0, "rgba(0,0,0,0)");
-      vignette.addColorStop(1, "rgba(0,10,0,0.5)");
-      ctx.fillStyle = vignette;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // True 3-layer compositing: Background -> Ghost -> Person Cutout on top
+      const dataUrl = await compositeLayeredScreenshot(video, clownImg!, { faceBox });
 
       const now = new Date();
       setTimestamp(`${now.toLocaleDateString()} ${now.toLocaleTimeString()}`);
-      setPhotoDataUrl(canvas.toDataURL("image/jpeg", 0.94));
+      setPhotoDataUrl(dataUrl);
       setDeveloping(false);
-    };
 
-    setTimeout(() => {
-      if (!photoDataUrl) {
-        setPhotoDataUrl(canvas.toDataURL("image/jpeg", 0.88));
-        setDeveloping(false);
+      if (onPhotoCaptured && dataUrl) {
+        onPhotoCaptured(dataUrl);
       }
-    }, 400);
+    } catch (err) {
+      console.warn("Screenshot compositing error:", err);
+      setDeveloping(false);
+    }
   };
 
   useEffect(() => {
@@ -170,7 +132,7 @@ export const PolaroidViewer: React.FC<PhotoViewerProps> = ({
           </span>
           <div className="h-4 w-px bg-neutral-400" />
           <span className="text-[11px] text-red-900 font-semibold italic ml-auto">
-            UNIDENTIFIED SHADOW DETECTED IN ROOM
+            UNIDENTIFIED ENTITY DETECTED BEHIND PLAYER
           </span>
         </div>
 
@@ -180,13 +142,13 @@ export const PolaroidViewer: React.FC<PhotoViewerProps> = ({
             {photoDataUrl && !developing ? (
               <img
                 src={photoDataUrl}
-                alt="Captured surveillance frame with standing clown"
+                alt="Captured surveillance frame with entity standing behind player"
                 className="w-full h-full object-cover"
               />
             ) : (
               <div className="flex flex-col items-center gap-2 text-neutral-400 font-mono text-xs">
                 <RefreshCw className="w-6 h-6 animate-spin text-neutral-300" />
-                <span>RENDERING HIGH-RES BITMAP...</span>
+                <span>COMPOSITING 3-LAYER DEPTH BITMAP...</span>
               </div>
             )}
 
@@ -202,7 +164,7 @@ export const PolaroidViewer: React.FC<PhotoViewerProps> = ({
         <div className="px-2 py-0.5 border-t border-neutral-400 flex items-center justify-between text-[11px] font-sans text-neutral-700 bg-[#c0c0c0]">
           <span>640 x 480 pixels | 24-bit TrueColor</span>
           <div className="flex items-center gap-2">
-            <span className="font-mono text-red-800 font-bold">STATUS: OBSERVED</span>
+            <span className="font-mono text-red-800 font-bold">DEPTH: BEHIND SUBJECT</span>
             <button
               onClick={onClose}
               className="win98-bevel-button px-3 py-0.5 text-xs text-black font-semibold"
