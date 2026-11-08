@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { UserCheck, X, Minus, Square, RefreshCw, Eye } from "lucide-react";
 import { FaceBox } from "@/utils/telemetry";
+import { applySmileMovieWarp } from "@/utils/segmentation";
 
 interface AvatarWindowProps {
   isOpen: boolean;
@@ -15,7 +16,7 @@ interface AvatarWindowProps {
 /**
  * Avatar Sync Window
  * Takes a snapshot of the player's real face from webcam,
- * applies a canvas warp filter (eyes slightly too wide, uncanny slow grin),
+ * applies the dramatic "Smile" movie uncanny grin warp (ear-to-ear smile, no eye enlargement),
  * and freezes it while the player's real face keeps moving.
  */
 export const AvatarWindow: React.FC<AvatarWindowProps> = ({
@@ -53,93 +54,26 @@ export const AvatarWindow: React.FC<AvatarWindowProps> = ({
     const videoH = video.videoHeight || 480;
     const cx = (faceBox?.centerX ?? 0.5) * videoW;
     const cy = (faceBox?.centerY ?? 0.45) * videoH;
-    const cropSize = Math.min(videoW, videoH) * 0.7;
+    const cropSize = Math.min(videoW, videoH) * 0.72;
     const sx = Math.max(0, cx - cropSize / 2);
     const sy = Math.max(0, cy - cropSize / 2);
 
     ctx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, width, height);
     ctx.restore();
 
-    // 2. Apply Uncanny Facial Warps (Eyes slightly too wide, slow unnerving smile)
-    const imgData = ctx.getImageData(0, 0, width, height);
-    const src = new Uint8ClampedArray(imgData.data);
-    const dst = imgData.data;
-
-    // Face landmarks estimation inside 360x360 crop:
-    // Left eye center: ~ (width * 0.35, height * 0.38)
-    // Right eye center: ~ (width * 0.65, height * 0.38)
-    // Mouth center: ~ (width * 0.50, height * 0.72)
-    // Mouth left corner: ~ (width * 0.38, height * 0.73)
-    // Mouth right corner: ~ (width * 0.62, height * 0.73)
-
-    const eyeLeftX = width * 0.35;
-    const eyeRightX = width * 0.65;
-    const eyeY = height * 0.38;
-    const eyeRadius = width * 0.14;
-
-    const mouthX = width * 0.5;
-    const mouthY = height * 0.72;
-    const mouthRadius = width * 0.22;
-
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        let srcX = x;
-        let srcY = y;
-
-        // --- WARP 1: EYES SLIGHTLY TOO WIDE (Spherical / Radial Magnification) ---
-        // Left Eye Magnification
-        const dLeft = Math.hypot(x - eyeLeftX, y - eyeY);
-        if (dLeft < eyeRadius) {
-          const factor = 1 - Math.pow(dLeft / eyeRadius, 2) * 0.22;
-          srcX = eyeLeftX + (x - eyeLeftX) * factor;
-          srcY = eyeY + (y - eyeY) * factor;
-        }
-
-        // Right Eye Magnification
-        const dRight = Math.hypot(x - eyeRightX, y - eyeY);
-        if (dRight < eyeRadius) {
-          const factor = 1 - Math.pow(dRight / eyeRadius, 2) * 0.22;
-          srcX = eyeRightX + (x - eyeRightX) * factor;
-          srcY = eyeY + (y - eyeY) * factor;
-        }
-
-        // --- WARP 2: UNCANNY SLOW SMILE (Pull mouth corners up & outwards) ---
-        const dMouth = Math.hypot(x - mouthX, y - mouthY);
-        if (dMouth < mouthRadius) {
-          const normDist = dMouth / mouthRadius;
-          const smileWeight = Math.cos(normDist * Math.PI * 0.5);
-
-          // Horizontal stretch towards edges
-          const dxMouth = x - mouthX;
-          if (Math.abs(dxMouth) > 8) {
-            // Pull corners up and out
-            const upLift = -Math.abs(dxMouth) * 0.28 * smileWeight;
-            srcY = y - upLift;
-            srcX = mouthX + dxMouth * (1 - smileWeight * 0.12);
-          }
-        }
-
-        // Clamp coordinates
-        const clX = Math.max(0, Math.min(width - 1, Math.round(srcX)));
-        const clY = Math.max(0, Math.min(height - 1, Math.round(srcY)));
-
-        const targetIdx = (y * width + x) * 4;
-        const sourceIdx = (clY * width + clX) * 4;
-
-        dst[targetIdx] = src[sourceIdx]; // R
-        dst[targetIdx + 1] = src[sourceIdx + 1]; // G
-        dst[targetIdx + 2] = src[sourceIdx + 2]; // B
-        dst[targetIdx + 3] = 255;
-      }
-    }
-
-    ctx.putImageData(imgData, 0, 0);
+    // 2. Apply "Smile" Movie Uncanny Grin Warp (ear-to-ear lifted smile, natural intense eyes)
+    applySmileMovieWarp(canvas, {
+      centerX: 0.5,
+      centerY: 0.45,
+      faceWidth: 0.48,
+      openRoomSide: "right",
+    });
 
     // Subtle ghostly desaturation & phosphor grade
     ctx.fillStyle = "rgba(0, 10, 5, 0.08)";
     ctx.fillRect(0, 0, width, height);
 
-    setAvatarDataUrl(canvas.toDataURL("image/jpeg", 0.9));
+    setAvatarDataUrl(canvas.toDataURL("image/jpeg", 0.92));
     setIsWarping(false);
     setSyncPercentage(Math.floor(Math.random() * 6) + 94);
   };
@@ -182,7 +116,7 @@ export const AvatarWindow: React.FC<AvatarWindowProps> = ({
           <div className="flex gap-3">
             <span className="hover:underline cursor-pointer">Model</span>
             <span className="hover:underline cursor-pointer">Rehearse</span>
-            <span className="hover:underline cursor-pointer">Mimic</span>
+            <span className="hover:underline cursor-pointer">Smile</span>
           </div>
           <span className="text-[10px] font-mono text-red-900 font-bold">
             SYNC: {syncPercentage}%
@@ -201,7 +135,7 @@ export const AvatarWindow: React.FC<AvatarWindowProps> = ({
             ) : (
               <div className="flex flex-col items-center gap-2 text-neutral-400 font-mono text-xs">
                 <RefreshCw className="w-6 h-6 animate-spin text-neutral-200" />
-                <span>SYNCHRONIZING PHYSICAL FEATURES...</span>
+                <span>SYNCHRONIZING SMILE CURVATURE...</span>
               </div>
             )}
 
@@ -221,7 +155,7 @@ export const AvatarWindow: React.FC<AvatarWindowProps> = ({
           </p>
 
           <div className="win98-bevel-in bg-white p-2 text-[10px] font-mono text-neutral-700 flex justify-between">
-            <span>OCULAR_MAGNIFICATION: 1.22x</span>
+            <span>SMILE_CURVATURE: 1.85x</span>
             <span className="text-red-800 font-bold">EXPRESSION: LOCKED</span>
           </div>
 
@@ -231,7 +165,7 @@ export const AvatarWindow: React.FC<AvatarWindowProps> = ({
               className="win98-bevel-button px-3 py-1 text-xs text-black font-semibold flex items-center gap-1"
             >
               <RefreshCw className="w-3 h-3" />
-              <span>Resync Face</span>
+              <span>Resync Smile</span>
             </button>
             <button
               onClick={onClose}

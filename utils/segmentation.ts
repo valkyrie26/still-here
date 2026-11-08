@@ -4,7 +4,7 @@
  * Strict Layer Ordering:
  * 1. Bottom Layer: Mirrored room background
  * 2. Middle Layer: Dark, blurry, half-hidden ghost (creepy_clown_standing)
- * 3. Top Layer: Player foreground cutout (head & shoulders)
+ * 3. Top Layer: Player foreground cutout (head & shoulders) with "Smile" movie warp
  *
  * This guarantees the entity appears strictly BEHIND the player, never overlaid on top.
  */
@@ -46,6 +46,97 @@ export async function initSelfieSegmenter() {
     isSegmenterLoading = false;
     return null;
   }
+}
+
+/**
+ * Applies the dramatic "Smile" movie uncanny grin warp
+ * - Stretches mouth corners ear-to-ear
+ * - Lifts mouth corners high up towards cheekbones
+ * - Curves lower lip into a wide, menacing crescent
+ * - No eye distortion (keeping eyes intense and natural, matching the Smile movie reference)
+ * - Bilinear interpolation for smooth, seamless rendering
+ */
+export function applySmileMovieWarp(
+  canvas: HTMLCanvasElement,
+  faceBox?: FaceBox
+): HTMLCanvasElement {
+  const width = canvas.width;
+  const height = canvas.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return canvas;
+
+  const imgData = ctx.getImageData(0, 0, width, height);
+  const src = new Uint8ClampedArray(imgData.data);
+  const dst = imgData.data;
+
+  // Compute mouth center and dimensions dynamically from faceBox
+  const cx = (faceBox?.centerX ?? 0.5) * width;
+  const cy = (faceBox?.centerY ?? 0.45) * height;
+  const fw = (faceBox?.faceWidth ?? 0.32) * width;
+
+  // Mouth center is approximately 55-65% of faceWidth below face center
+  const mouthX = cx;
+  const mouthY = Math.min(height * 0.88, cy + fw * 0.62);
+  const mouthRadiusX = fw * 0.72; // Wide reach from cheek to cheek
+  const mouthRadiusY = fw * 0.46;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let srcX = x;
+      let srcY = y;
+
+      const normX = (x - mouthX) / mouthRadiusX;
+      const normY = (y - mouthY) / mouthRadiusY;
+      const distSq = normX * normX + normY * normY;
+
+      if (distSq < 1.0) {
+        // Smooth quartic falloff for organic facial deformation
+        const weight = (1 - distSq) * (1 - distSq);
+
+        // 1. Extreme upward curl of mouth corners (Smile movie parabola)
+        // Corner lift increases quadratically with horizontal distance
+        const cornerLiftFactor = normX * normX;
+        const maxLift = mouthRadiusY * 0.85; // Strong dramatic lift
+        const upLift = cornerLiftFactor * maxLift * weight;
+
+        // 2. Horizontal mouth widening (ear-to-ear stretch)
+        const stretchFactor = 0.30 * weight;
+        srcX = mouthX + (x - mouthX) * (1 - stretchFactor);
+
+        // 3. Center sinister dip (deep curved crescent)
+        const centerDipFactor = Math.max(0, 1 - Math.abs(normX) * 2.2);
+        const centerDip = centerDipFactor * (mouthRadiusY * 0.16) * weight;
+
+        // Inverse mapping
+        srcY = y + upLift - centerDip;
+      }
+
+      // Bilinear interpolation for crisp, photo-realistic blending
+      const x0 = Math.max(0, Math.min(width - 1, Math.floor(srcX)));
+      const x1 = Math.max(0, Math.min(width - 1, x0 + 1));
+      const y0 = Math.max(0, Math.min(height - 1, Math.floor(srcY)));
+      const y1 = Math.max(0, Math.min(height - 1, y0 + 1));
+
+      const fx = srcX - Math.floor(srcX);
+      const fy = srcY - Math.floor(srcY);
+
+      const i00 = (y0 * width + x0) * 4;
+      const i10 = (y0 * width + x1) * 4;
+      const i01 = (y1 * width + x0) * 4;
+      const i11 = (y1 * width + x1) * 4;
+
+      const targetIdx = (y * width + x) * 4;
+
+      for (let c = 0; c < 4; c++) {
+        const top = src[i00 + c] * (1 - fx) + src[i10 + c] * fx;
+        const bot = src[i01 + c] * (1 - fx) + src[i11 + c] * fx;
+        dst[targetIdx + c] = Math.round(top * (1 - fy) + bot * fy);
+      }
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  return canvas;
 }
 
 /**
@@ -125,7 +216,6 @@ async function extractPlayerForegroundCutout(
   }
 
   // Geometric Anatomical Fallback (Head & Torso Cutout based on face telemetry)
-  // This smoothly extracts the head, neck, and shoulders so the ghost remains strictly behind
   const cx = (faceBox?.centerX ?? 0.5) * width;
   const cy = (faceBox?.centerY ?? 0.45) * height;
   const fw = (faceBox?.faceWidth ?? 0.32) * width;
@@ -157,7 +247,7 @@ async function extractPlayerForegroundCutout(
  * Composites the 3-layer screenshot:
  * 1. Room Background
  * 2. Creepy Clown Entity (blurred, dark, grounded from bottom)
- * 3. Person Cutout strictly on top
+ * 3. Person Cutout strictly on top (with uncanny "Smile" movie grin)
  */
 export async function compositeLayeredScreenshot(
   video: HTMLVideoElement,
@@ -225,6 +315,9 @@ export async function compositeLayeredScreenshot(
   // LAYER 3: Person Foreground Cutout (Head & Shoulders ON TOP)
   const playerCutout = await extractPlayerForegroundCutout(videoCanvas, options.faceBox);
   if (playerCutout) {
+    // Apply uncanny "Smile" movie grin warp to player cutout
+    applySmileMovieWarp(playerCutout, options.faceBox);
+
     ctx.save();
     // Draw the person cutout directly on top of the ghost
     ctx.drawImage(playerCutout, 0, 0);
