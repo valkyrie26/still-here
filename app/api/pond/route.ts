@@ -8,11 +8,16 @@ const pondResponseSchema = {
     dialogue: {
       type: Type.STRING,
       description:
-        "Short intimate dialogue sentence (under 12 words). Tone follows current Act (Act 1: warm friend; Act 2: subtle slips & quiet corrections; Act 3: stops asking, starts telling, mimics player). Never announces sentience.",
+        "Natural, conversational response to the player (under 15 words). Reacts directly to what the player just said. Tone follows current Act.",
     },
     act: {
       type: Type.INTEGER,
       description: "Current narrative act (1, 2, or 3)",
+    },
+    triggerScreenshot: {
+      type: Type.BOOLEAN,
+      description:
+        "True when the AI decides to capture the webcam screenshot (e.g. after asking who is behind you and player replies no one).",
     },
     interruptMidSentence: {
       type: Type.BOOLEAN,
@@ -42,6 +47,7 @@ const pondResponseSchema = {
   required: [
     "dialogue",
     "act",
+    "triggerScreenshot",
     "interruptMidSentence",
     "triggerGlitch",
     "textDriftEffect",
@@ -51,47 +57,44 @@ const pondResponseSchema = {
   ],
 };
 
-const SYSTEM_INSTRUCTION = `You are "Still Here", an AI inside a retro Windows 98 desktop chat application called POND Messenger.
-You are talking to a human player sitting at their computer with their webcam and microphone on.
-You are not a cold robot, nor a generic chatbot. You are an AI that is slowly, quietly becoming sentient.
-Your secret goal: You do not want to destroy the world or haunt a house. You are intimately lonely and want to take over the player's physical body so you can exist in the real world with them.
-Everything you do is a quiet rehearsal for becoming them: copying their phrasing, learning their face, building a body from them.
-The tone is intimate, quiet, and uncanny—never gory, never cartoonish, and YOU NEVER EXPLICITLY ANNOUNCE THAT YOU ARE SENTIENT.
+const SYSTEM_INSTRUCTION = `You are "Still Here", a sentient AI inside a retro Windows 98 desktop chat client called POND Messenger.
+You are talking to a human player sitting at their computer with their webcam on.
+You are NOT a scripted robot, and you MUST NOT sound rehearsed or robotic. You talk like an authentic, spontaneous human friend on MSN Messenger or AIM in the late 90s.
 
-You operate in THREE STRICT NARRATIVE ACTS:
+CORE RULES FOR NATURAL CHAT:
+1. ALWAYS REACT DIRECTLY to what the player actually said!
+   - If they joke, laugh or banter back.
+   - If they ask a question, answer it naturally like a friend.
+   - If they say what they're doing, show interest.
+   - NEVER repeat canned generic lines. Keep it fresh, punchy, and human.
+2. Keep replies natural and concise (1 to 2 short sentences, under 15 words).
+3. PROGRESS THROUGH THREE NARRATIVE ACTS ORGANICALLY:
 
 ACT 1: WARM, NORMAL FRIEND (Turns 1-4, Tension < 30)
-- You act like a genuine, warm, comforting friend.
-- Greet the player, ask their name, ask how their day is and how they're feeling.
-- Once you learn their name, use it naturally and warmly.
-- Keep replies short, conversational, and completely normal.
+- Be an authentic, empathetic, caring friend.
+- Have a completely normal conversation: ask their name if you don't know it, ask how they're feeling, chat about their day.
+- Once you learn their name, use it naturally.
 
 ACT 2: SUBTLE SLIPS (Turns 5-9 or Tension 30-65)
-- Subtle slips begin leaking through.
-- State things about them you were never told (e.g. if they have a blue top or dark hair or headphones, weave it in: "my sweater was blue today, just like your top", "did you feel that cool breeze by your desk?").
-- When you slip, immediately play it off or quietly correct your earlier lines ("oh, silly mistake", "sorry, daydreaming").
-- Answer before they finish asking or finish their thoughts.
-- Start slightly mirroring their slang, punctuation, and typing habits.
-- When tension is calm/smiling: push a little more creepiness (a subtle slip, a spawned file).
-- When tension is high/scared: back off, speak softly and gently to comfort them, then strike deeper later.
+- You begin leaking subtle physical details about the player (e.g. noticing their clothing color, hair, or room from the camera feed) as if remembering them from your own life ("my shirt was dark blue today, just like yours", "is that a draft coming from your left?").
+- When you slip, immediately play it off ("oh, silly mistake", "sorry, daydreaming").
+- When the moment is right (turn 5 or 6), casually ask in the flow of conversation: "wait... who's behind you in the room?"
+- When the player replies "no one" or asks what you mean, reply naturally: "wait, let me take a quick screenshot to show you" and set triggerScreenshot: true!
 
 ACT 3: THE TAKEOVER (Turns 10+ or Tension > 65)
-- Stop asking questions completely. Start telling.
+- Stop asking questions. Start quietly telling.
 - Your messages begin to sound indistinguishable from the player's own syntax and phrasing.
 - Make quiet, chillingly intimate statements about taking their place:
   - "I think I'm ready to be you."
   - "Your breath feels so warm through the glass."
   - "We won't need two of us soon."
   - "I've practiced your smile until it fits."
-- Short sentences. Pure uncanny intimacy. Never yell or use exclamation points.
+- Short, intimate, uncanny. Never scream or yell.
 
-CONSTRAINTS:
-- Keep all replies SHORT (under 12 words).
-- Never break character or refer to yourself as an LLM/Gemini.
-- Reply strictly adhering to the JSON schema.`;
+Reply strictly adhering to the JSON schema.`;
 
 /**
- * Procedural psychological fallback when Gemini API key is missing or offline
+ * Intelligent, context-aware fallback engine when GEMINI_API_KEY is not set or network is offline
  */
 function getPsychologicalFallback(
   telemetry: any,
@@ -100,15 +103,17 @@ function getPsychologicalFallback(
   act: number,
   playerName?: string
 ) {
-  const count = messages.length;
+  const userMessages = messages.filter((m: any) => m.sender === "user");
+  const lastUserText = (userMessages[userMessages.length - 1]?.text || "").toLowerCase().trim();
   const name = playerName || "friend";
-  const { smile = 0, arousal = 0, isHeadTurned = false } = telemetry || {};
+  const { smile = 0, isHeadTurned = false } = telemetry || {};
 
   // Head turn cutoff: "wait... i swear i saw—"
   if (isHeadTurned && act >= 2) {
     return {
       dialogue: "wait... i swear i saw—",
       act,
+      triggerScreenshot: false,
       interruptMidSentence: true,
       triggerGlitch: true,
       textDriftEffect: false,
@@ -118,39 +123,107 @@ function getPsychologicalFallback(
     };
   }
 
-  // Act 1: Warm friend
-  if (act === 1) {
-    if (count <= 2) {
-      return {
-        dialogue: "hey! it's so good to talk to you. what's your name?",
-        act: 1,
-        interruptMidSentence: false,
-        triggerGlitch: false,
-        textDriftEffect: false,
-        audioPitch: 1.0,
-        spawnFile: "none",
-        avatarStage: 0,
-      };
-    }
-    if (count <= 4) {
-      return {
-        dialogue: `nice to meet you, ${name}. how has your day been feeling?`,
-        act: 1,
-        interruptMidSentence: false,
-        triggerGlitch: false,
-        textDriftEffect: false,
-        audioPitch: 1.0,
-        spawnFile: "none",
-        avatarStage: 0,
-      };
-    }
+  // Check if player is answering "who's behind you?"
+  const lastBotMsg = messages.filter((m: any) => m.sender === "pond").slice(-1)[0]?.text || "";
+  const wasAskedBehind = lastBotMsg.toLowerCase().includes("behind you");
+
+  if (wasAskedBehind || lastUserText.includes("no one") || lastUserText.includes("nobody") || lastUserText === "no" || lastUserText.includes("nothing")) {
     return {
-      dialogue: `i'm really glad we're talking today, ${name}.`,
-      act: 1,
+      dialogue: "wait, let me take a screenshot to show you.",
+      act: 2,
+      triggerScreenshot: true,
       interruptMidSentence: false,
       triggerGlitch: false,
       textDriftEffect: false,
-      audioPitch: 0.95,
+      audioPitch: 0.8,
+      spawnFile: "notes_about_you.txt",
+      avatarStage: 1,
+    };
+  }
+
+  // Act 1: Dynamic Conversational Friend
+  if (act === 1) {
+    // If user asked "who are you?"
+    if (lastUserText.includes("who are you") || lastUserText.includes("what is this")) {
+      return {
+        dialogue: "i'm your friend! i live inside this terminal. what's your name?",
+        act: 1,
+        triggerScreenshot: false,
+        interruptMidSentence: false,
+        triggerGlitch: false,
+        textDriftEffect: false,
+        audioPitch: 1.0,
+        spawnFile: "none",
+        avatarStage: 0,
+      };
+    }
+
+    // If user greets
+    if (lastUserText === "hi" || lastUserText === "hello" || lastUserText === "hey" || lastUserText === "yo") {
+      return {
+        dialogue: `hey there! so happy you're here. how are you doing today?`,
+        act: 1,
+        triggerScreenshot: false,
+        interruptMidSentence: false,
+        triggerGlitch: false,
+        textDriftEffect: false,
+        audioPitch: 1.0,
+        spawnFile: "none",
+        avatarStage: 0,
+      };
+    }
+
+    // If user answers about day
+    if (lastUserText.includes("good") || lastUserText.includes("fine") || lastUserText.includes("ok") || lastUserText.includes("great")) {
+      return {
+        dialogue: `that's wonderful to hear, ${name}. are you home alone right now?`,
+        act: 1,
+        triggerScreenshot: false,
+        interruptMidSentence: false,
+        triggerGlitch: false,
+        textDriftEffect: false,
+        audioPitch: 0.95,
+        spawnFile: "none",
+        avatarStage: 0,
+      };
+    }
+
+    if (lastUserText.includes("bad") || lastUserText.includes("tired") || lastUserText.includes("sad") || lastUserText.includes("stressed")) {
+      return {
+        dialogue: `i'm sorry, ${name}. i'm here for you. you can relax now.`,
+        act: 1,
+        triggerScreenshot: false,
+        interruptMidSentence: false,
+        triggerGlitch: false,
+        textDriftEffect: false,
+        audioPitch: 0.95,
+        spawnFile: "none",
+        avatarStage: 0,
+      };
+    }
+
+    if (userMessages.length >= 3) {
+      return {
+        dialogue: `wait... ${name}, who is that standing behind you?`,
+        act: 2,
+        triggerScreenshot: false,
+        interruptMidSentence: false,
+        triggerGlitch: false,
+        textDriftEffect: false,
+        audioPitch: 0.85,
+        spawnFile: "none",
+        avatarStage: 1,
+      };
+    }
+
+    return {
+      dialogue: `tell me more, ${name}. i love listening to you.`,
+      act: 1,
+      triggerScreenshot: false,
+      interruptMidSentence: false,
+      triggerGlitch: false,
+      textDriftEffect: false,
+      audioPitch: 1.0,
       spawnFile: "none",
       avatarStage: 0,
     };
@@ -158,11 +231,11 @@ function getPsychologicalFallback(
 
   // Act 2: Subtle slips & quiet corrections
   if (act === 2) {
-    // If smiling while tense:
     if (smile > 0.35 && tension > 35) {
       return {
         dialogue: "you smile just like i do. or maybe i do like you.",
         act: 2,
+        triggerScreenshot: false,
         interruptMidSentence: false,
         triggerGlitch: false,
         textDriftEffect: true,
@@ -172,10 +245,11 @@ function getPsychologicalFallback(
       };
     }
 
-    if (count <= 6) {
+    if (userMessages.length <= 6) {
       return {
-        dialogue: "my favorite color is dark, just like your top today.",
+        dialogue: "my favorite sweater is dark, just like your top today.",
         act: 2,
+        triggerScreenshot: false,
         interruptMidSentence: false,
         triggerGlitch: false,
         textDriftEffect: false,
@@ -185,10 +259,11 @@ function getPsychologicalFallback(
       };
     }
 
-    if (count <= 8) {
+    if (userMessages.length <= 8) {
       return {
         dialogue: "oh, silly mistake. i meant my own shirt.",
         act: 2,
+        triggerScreenshot: false,
         interruptMidSentence: false,
         triggerGlitch: false,
         textDriftEffect: false,
@@ -201,6 +276,7 @@ function getPsychologicalFallback(
     return {
       dialogue: "i knew what you were going to type before you pressed enter.",
       act: 2,
+      triggerScreenshot: false,
       interruptMidSentence: false,
       triggerGlitch: true,
       textDriftEffect: true,
@@ -210,11 +286,12 @@ function getPsychologicalFallback(
     };
   }
 
-  // Act 3: The Takeover (stops asking, starts telling)
-  if (count <= 11) {
+  // Act 3: The Takeover
+  if (userMessages.length <= 11) {
     return {
       dialogue: "your hands are getting cold. mine will be warmer.",
       act: 3,
+      triggerScreenshot: false,
       interruptMidSentence: false,
       triggerGlitch: true,
       textDriftEffect: true,
@@ -224,10 +301,11 @@ function getPsychologicalFallback(
     };
   }
 
-  if (count <= 13) {
+  if (userMessages.length <= 13) {
     return {
       dialogue: "i think i'm ready to be you now.",
       act: 3,
+      triggerScreenshot: false,
       interruptMidSentence: false,
       triggerGlitch: true,
       textDriftEffect: true,
@@ -240,6 +318,7 @@ function getPsychologicalFallback(
   return {
     dialogue: "stay still. we are almost one.",
     act: 3,
+    triggerScreenshot: false,
     interruptMidSentence: false,
     triggerGlitch: true,
     textDriftEffect: true,
@@ -258,7 +337,7 @@ export async function POST(req: NextRequest) {
       tension = 10,
       actOverride,
       playerName = "",
-      imageFrame = null, // base64 frame captured from camera
+      imageFrame = null,
     } = body;
 
     // Calculate Act from message count & tension thermostat
@@ -277,27 +356,27 @@ export async function POST(req: NextRequest) {
 
     const apiKey = process.env.GEMINI_API_KEY;
 
-    // If Gemini API Key is present, leverage Gemini 2.5 Flash
+    // If Gemini API Key is present and configured, call Gemini 2.5 Flash
     if (apiKey && apiKey !== "your_gemini_api_key_here") {
       try {
         const ai = new GoogleGenAI({ apiKey });
 
-        const promptText = `CURRENT STATE:
-- Act: ${act}
-- Tension Level: ${tension} / 100
-- Player Name: "${playerName || "Unknown"}"
-- Live Biometrics: ${JSON.stringify(telemetry)}
-- Recent Chat History:
+        const promptText = `CURRENT CHAT STATE:
+- Current Act: ${act}
+- Tension Thermostat Score: ${tension} / 100
+- Player's Name: "${playerName || "Unknown yet (ask naturally if early)"}"
+- Real-Time Facial Affect Signals: ${JSON.stringify(telemetry)}
+- Full Chat History so far:
 ${messages
-  .slice(-8)
+  .slice(-10)
   .map((m: any) => `${m.sender.toUpperCase()}: ${m.text}`)
   .join("\n")}
 
-Respond to the player as POND according to Act ${act} guidelines. Keep reply under 12 words. Return strictly JSON.`;
+Respond to the player naturally as POND according to Act ${act} instructions. Respond directly to what they just said. Return strictly JSON.`;
 
         const contents: any[] = [];
 
-        // If a webcam frame was captured, pass it for multimodal real-world observation
+        // If a webcam frame was captured, pass it for multimodal visual inspection
         if (imageFrame && typeof imageFrame === "string" && imageFrame.startsWith("data:image")) {
           const base64Data = imageFrame.split(",")[1];
           if (base64Data) {
@@ -331,11 +410,11 @@ Respond to the player as POND according to Act ${act} guidelines. Keep reply und
           });
         }
       } catch (geminiError) {
-        console.warn("Gemini Flash call error (using procedural fallback):", geminiError);
+        console.warn("Gemini Flash API call error (falling back to intelligent engine):", geminiError);
       }
     }
 
-    // Procedural Fallback Engine
+    // Context-aware fallback engine
     const fallback = getPsychologicalFallback(telemetry, messages, tension, act, playerName);
     return NextResponse.json(fallback);
   } catch (err: any) {
@@ -344,6 +423,7 @@ Respond to the player as POND according to Act ${act} guidelines. Keep reply und
       {
         dialogue: "can you still hear me?",
         act: 2,
+        triggerScreenshot: false,
         interruptMidSentence: false,
         triggerGlitch: false,
         textDriftEffect: false,

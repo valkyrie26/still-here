@@ -347,69 +347,15 @@ export default function Home() {
     setIsAiTyping(true);
 
     // Learn player's name if in Act 1
-    if (storyStage === 0 && !playerName) {
+    if (act === 1 && !playerName) {
       const words = userText.split(" ");
       const nameCandidate = words[words.length - 1].replace(/[^a-zA-Z]/g, "");
-      if (nameCandidate) {
+      if (nameCandidate && nameCandidate.length > 1) {
         setPlayerName(nameCandidate);
       }
     }
 
-    // --- STORY STAGE SCRIPT SEQUENCE (Priority 1 & 2 Milestones) ---
-
-    // STAGE 0 -> 1: Greets warmly, asks about room
-    if (storyStage === 0) {
-      setTimeout(() => {
-        const reply = `cool! nice to meet you, ${playerName || "friend"}. are you in your room right now?`;
-        setMessages((prev) => [
-          ...prev,
-          { id: `pond-${Date.now()}`, sender: "pond", text: reply },
-        ]);
-        playTypewriterForText(reply);
-        setStoryStage(1);
-        setIsAiTyping(false);
-      }, 950);
-      return;
-    }
-
-    // STAGE 1 -> 2: The Bait ("who's behind you?")
-    if (storyStage === 1) {
-      setTimeout(() => {
-        const reply = "wait... who's behind you?";
-        setMessages((prev) => [
-          ...prev,
-          { id: `pond-${Date.now()}`, sender: "pond", text: reply },
-        ]);
-        playTypewriterForText(reply);
-        setStoryStage(2);
-        setIsAiTyping(false);
-      }, 1100);
-      return;
-    }
-
-    // STAGE 2 -> 3: Player says "no one" -> AI says "wait, I'll take a screenshot"
-    if (storyStage === 2) {
-      setTimeout(() => {
-        const reply = "wait, i'll take a screenshot";
-        setMessages((prev) => [
-          ...prev,
-          { id: `pond-${Date.now()}`, sender: "pond", text: reply },
-        ]);
-        playTypewriterForText(reply);
-        setStoryStage(3);
-        setAct(2); // Transition to Act 2
-        setTension((prev) => Math.max(38, prev + 15));
-        setIsAiTyping(false);
-
-        // Take snapshot right after message is typed
-        setTimeout(() => {
-          triggerScreenshotCapture();
-        }, 1400);
-      }, 900);
-      return;
-    }
-
-    // STAGE 3+: Subsequent turns driven by Gemini 2.5 Flash / Psychological Fallback
+    // Call dynamic backend engine (Gemini 2.5 Flash / Intelligent Affect Engine)
     try {
       const res = await fetch("/api/pond", {
         method: "POST",
@@ -427,6 +373,9 @@ export default function Home() {
       const data = await res.json();
 
       if (data && data.dialogue) {
+        if (data.act) {
+          setAct(data.act);
+        }
         if (data.audioPitch) {
           typingAudioPitch.current = data.audioPitch;
         }
@@ -435,6 +384,11 @@ export default function Home() {
         }
         if (data.textDriftEffect) {
           setTextDriftTrigger(true);
+        }
+        if (data.triggerScreenshot) {
+          setTimeout(() => {
+            triggerScreenshotCapture();
+          }, 1200);
         }
         if (data.spawnFile && data.spawnFile !== "none") {
           const fileKey = data.spawnFile.replace(".txt", "").replace(".bmp", "").replace(".avi", "");
@@ -446,7 +400,7 @@ export default function Home() {
           setActiveWindows((prev) => ({ ...prev, avatar: true }));
         }
 
-        // If dialogue contains "I think I'm ready to be you", advance to Climax
+        // If dialogue contains "ready to be you", advance to Climax
         if (data.dialogue.toLowerCase().includes("ready to be you")) {
           setAct(3);
           setTimeout(() => {
@@ -467,7 +421,7 @@ export default function Home() {
         playTypewriterForText(data.dialogue);
       }
     } catch (err) {
-      const fallbackReply = "look closely at the photo.";
+      const fallbackReply = "i'm listening. tell me more.";
       setMessages((prev) => [
         ...prev,
         { id: `pond-${Date.now()}`, sender: "pond", text: fallbackReply },

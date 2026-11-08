@@ -49,12 +49,12 @@ export async function initSelfieSegmenter() {
 }
 
 /**
- * Applies the dramatic "Smile" movie uncanny grin warp
- * - Stretches mouth corners ear-to-ear
- * - Lifts mouth corners high up towards cheekbones
- * - Curves lower lip into a wide, menacing crescent
- * - No eye distortion (keeping eyes intense and natural, matching the Smile movie reference)
- * - Bilinear interpolation for smooth, seamless rendering
+ * Applies the dramatic "Smile" movie uncanny grin warp:
+ * - Extends the mouth edges/corners far UPWARDS towards cheekbones/ears
+ * - Stretches the mouth horizontally wide across cheeks
+ * - Does NOT pull lower lips downwards (preserves natural lip/chin contour)
+ * - Centers eyes facing directly forward at camera lens
+ * - Bilinear interpolation for smooth, photo-realistic blending
  */
 export function applySmileMovieWarp(
   canvas: HTMLCanvasElement,
@@ -69,46 +69,71 @@ export function applySmileMovieWarp(
   const src = new Uint8ClampedArray(imgData.data);
   const dst = imgData.data;
 
-  // Compute mouth center and dimensions dynamically from faceBox
+  // Compute anatomical coordinates from faceBox
   const cx = (faceBox?.centerX ?? 0.5) * width;
   const cy = (faceBox?.centerY ?? 0.45) * height;
   const fw = (faceBox?.faceWidth ?? 0.32) * width;
 
-  // Mouth center is approximately 55-65% of faceWidth below face center
+  // Mouth center: located strictly below the nose
   const mouthX = cx;
-  const mouthY = Math.min(height * 0.88, cy + fw * 0.62);
-  const mouthRadiusX = fw * 0.72; // Wide reach from cheek to cheek
-  const mouthRadiusY = fw * 0.46;
+  const mouthY = Math.min(height * 0.86, cy + fw * 0.62);
+  const mouthRadiusX = fw * 0.74; // Wide reach cheek-to-cheek
+  const mouthRadiusY = fw * 0.44;
+
+  // Eye centers for forward gaze locking
+  const eyeLeftX = cx - fw * 0.34;
+  const eyeRightX = cx + fw * 0.34;
+  const eyeY = cy - fw * 0.12;
+  const eyeRadius = fw * 0.18;
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       let srcX = x;
       let srcY = y;
 
-      const normX = (x - mouthX) / mouthRadiusX;
-      const normY = (y - mouthY) / mouthRadiusY;
-      const distSq = normX * normX + normY * normY;
+      // 1. FORWARD EYE GAZE LOCKING:
+      // Subtle gaze-centering so both eyes lock directly on camera forward
+      const dEyeLeft = Math.hypot(x - eyeLeftX, y - eyeY);
+      if (dEyeLeft < eyeRadius) {
+        const eyeWeight = (1 - dEyeLeft / eyeRadius);
+        // Gently pull pupil towards optical center of socket
+        srcX = x + (eyeLeftX - x) * 0.12 * eyeWeight;
+      }
+      const dEyeRight = Math.hypot(x - eyeRightX, y - eyeY);
+      if (dEyeRight < eyeRadius) {
+        const eyeWeight = (1 - dEyeRight / eyeRadius);
+        srcX = x + (eyeRightX - x) * 0.12 * eyeWeight;
+      }
 
-      if (distSq < 1.0) {
-        // Smooth quartic falloff for organic facial deformation
-        const weight = (1 - distSq) * (1 - distSq);
+      // 2. "SMILE" MOVIE GRIN WARP (CORNER LIFT ONLY, NO LOWER LIP DIP):
+      // Only apply to lower face below the nose line (y > cy + fw * 0.28)
+      if (y > cy + fw * 0.28) {
+        const normX = (x - mouthX) / mouthRadiusX;
+        const normY = (y - mouthY) / mouthRadiusY;
+        const distSq = normX * normX + normY * normY;
 
-        // 1. Extreme upward curl of mouth corners (Smile movie parabola)
-        // Corner lift increases quadratically with horizontal distance
-        const cornerLiftFactor = normX * normX;
-        const maxLift = mouthRadiusY * 0.85; // Strong dramatic lift
-        const upLift = cornerLiftFactor * maxLift * weight;
+        if (distSq < 1.0) {
+          // Smooth falloff from mouth center
+          const weight = (1 - distSq) * (1 - distSq);
 
-        // 2. Horizontal mouth widening (ear-to-ear stretch)
-        const stretchFactor = 0.30 * weight;
-        srcX = mouthX + (x - mouthX) * (1 - stretchFactor);
+          // Focus purely on outer corners/edges (|normX| > 0.15)
+          const absX = Math.abs(normX);
+          const cornerFactor = Math.pow(absX, 1.35); // 0 at center lips, accelerates to 1 at cheek corners
 
-        // 3. Center sinister dip (deep curved crescent)
-        const centerDipFactor = Math.max(0, 1 - Math.abs(normX) * 2.2);
-        const centerDip = centerDipFactor * (mouthRadiusY * 0.16) * weight;
+          // DRAMATIC UPWARD CORNER LIFT:
+          // Pulls the outer edges far up towards cheekbones
+          const maxLift = mouthRadiusY * 1.35; // Pronounced upward rise
+          const upLift = cornerFactor * maxLift * weight;
 
-        // Inverse mapping
-        srcY = y + upLift - centerDip;
+          // HORIZONTAL MOUTH WIDENING:
+          // Stretches mouth corners outward toward ears
+          const stretchFactor = 0.35 * weight;
+          srcX = mouthX + (x - mouthX) * (1 - stretchFactor);
+
+          // INVERSE MAPPING: To pull pixels UP, sample from lower down (y + upLift)
+          // NO lower lip dip! Central lips (absX < 0.2) receive 0 upward lift and 0 downward dip
+          srcY = y + upLift;
+        }
       }
 
       // Bilinear interpolation for crisp, photo-realistic blending
