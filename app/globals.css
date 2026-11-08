@@ -226,3 +226,31 @@ body {
   30%, 50%, 70% { transform: translate3d(-6px, 3px, 0); }
   40%, 60% { transform: translate3d(6px, -3px, 0); }
 }
+
+/* Screen Color Scare Visual Effects (Random Jumpscare Color Shifts) */
+.screen-color-blood {
+  background-color: #2b0000 !important;
+  filter: hue-rotate(295deg) saturate(3.8) contrast(1.4) brightness(0.85);
+  transition: filter 0.06s ease-out, background-color 0.06s ease-out;
+}
+
+.screen-color-invert {
+  filter: invert(1) hue-rotate(180deg) contrast(1.35) brightness(1.15);
+  transition: filter 0.04s ease-out;
+}
+
+.screen-color-corrupt {
+  background-color: #1a1200 !important;
+  filter: sepia(1) saturate(5) hue-rotate(330deg) contrast(1.6);
+  transition: filter 0.06s ease-out, background-color 0.06s ease-out;
+}
+
+.scare-flicker {
+  animation: scareFlicker 0.15s steps(2, start) infinite;
+}
+
+@keyframes scareFlicker {
+  0% { opacity: 0.9; }
+  50% { opacity: 1; }
+  100% { opacity: 0.93; }
+}

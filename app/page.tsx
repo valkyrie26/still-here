@@ -67,8 +67,10 @@ export default function Home() {
 
   // Paranoia & Atmosphere States
   const [glitchActive, setGlitchActive] = useState(false);
+  const [screenColorScare, setScreenColorScare] = useState<"none" | "blood" | "invert" | "corrupt">("none");
   const [screenDarkness, setScreenDarkness] = useState(0.0);
   const [textDriftTrigger, setTextDriftTrigger] = useState(false);
+  const lastColorScareTimeRef = useRef<number>(0);
 
   // Dynamic Spawning Files on Desktop
   const [spawnedFiles, setSpawnedFiles] = useState<{
@@ -134,6 +136,23 @@ export default function Home() {
     setGlitchActive(true);
     soundEngine.playGlitchSting();
     setTimeout(() => setGlitchActive(false), 280);
+  }, []);
+
+  // Screen Color Change Random Scare (blood crimson, photographic invert, or corrupt amber)
+  const triggerScreenColorScare = useCallback((mode?: "blood" | "invert" | "corrupt") => {
+    const modes: ("blood" | "invert" | "corrupt")[] = ["blood", "invert", "corrupt"];
+    const chosen = mode || modes[Math.floor(Math.random() * modes.length)];
+
+    setScreenColorScare(chosen);
+    soundEngine.playGlitchSting();
+
+    if (chosen === "blood") {
+      soundEngine.triggerSuddenSilence(1600);
+    }
+
+    setTimeout(() => {
+      setScreenColorScare("none");
+    }, 1800);
   }, []);
 
   // Shutter Snapshot Sequence with sudden silence
@@ -215,10 +234,16 @@ export default function Home() {
             setSpawnedFiles((prev) => ({ ...prev, video: true }));
           }
 
-          // Random visual creepiness: slight glitch or text drift
-          if (Math.random() < 0.25 && nextTension > 40) {
-            setTextDriftTrigger(true);
-            setTimeout(() => setTextDriftTrigger(false), 3000);
+          // Random visual creepiness: screen color scare, slight glitch, or text drift
+          if (nextTension > 30) {
+            const now = Date.now();
+            if (now - lastColorScareTimeRef.current > 22000 && Math.random() < 0.22) {
+              lastColorScareTimeRef.current = now;
+              triggerScreenColorScare();
+            } else if (Math.random() < 0.25) {
+              setTextDriftTrigger(true);
+              setTimeout(() => setTextDriftTrigger(false), 3000);
+            }
           }
         }
 
@@ -397,12 +422,14 @@ export default function Home() {
         });
       } else if (e.key === "6") {
         triggerEndingClimax();
+      } else if (e.key === "7") {
+        triggerScreenColorScare();
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [triggerGlitchSpike, triggerScreenshotCapture]);
+  }, [triggerGlitchSpike, triggerScreenshotCapture, triggerScreenColorScare]);
 
   // Send Message in Giant Text Chat
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -458,6 +485,9 @@ export default function Home() {
         }
         if (data.triggerGlitch) {
           triggerGlitchSpike();
+          if (Math.random() < 0.6) {
+            triggerScreenColorScare();
+          }
         }
         if (data.textDriftEffect) {
           setTextDriftTrigger(true);
@@ -511,8 +541,16 @@ export default function Home() {
 
   return (
     <main
-      className={`min-h-screen w-full relative overflow-hidden bg-[#008080] select-none font-sans flex flex-col items-center justify-center p-3 md:p-6 transition-all duration-1000 ${
+      className={`min-h-screen w-full relative overflow-hidden bg-[#008080] select-none font-sans flex flex-col items-center justify-center p-3 md:p-6 transition-all duration-300 ${
         glitchActive || screenShakeActive ? "screen-glitch screen-shake" : ""
+      } ${
+        screenColorScare === "blood"
+          ? "screen-color-blood scare-flicker"
+          : screenColorScare === "invert"
+          ? "screen-color-invert scare-flicker"
+          : screenColorScare === "corrupt"
+          ? "screen-color-corrupt scare-flicker"
+          : ""
       }`}
     >
       {/* Opening Screen: friend98 with glitchy text ("we have been through this 98 times.....") */}
@@ -828,7 +866,7 @@ export default function Home() {
       <div className="fixed bottom-12 right-4 z-20 bg-[#c0c0c0] win98-bevel-out p-2 shadow-lg max-w-[280px]">
         <div className="text-[11px] font-bold text-neutral-900 border-b border-neutral-400 pb-1 mb-1.5 flex items-center justify-between">
           <span>DEMO SHORTCUTS:</span>
-          <span className="text-[10px] text-neutral-600 font-mono">[KEYS 1-6]</span>
+          <span className="text-[10px] text-neutral-600 font-mono">[KEYS 1-7]</span>
         </div>
         <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono">
           <div className="bg-white p-1 win98-bevel-in">
@@ -848,6 +886,9 @@ export default function Home() {
           </div>
           <div className="bg-white p-1 win98-bevel-in">
             <span className="font-bold text-red-900">[6]</span> Climax Ending
+          </div>
+          <div className="bg-white p-1 win98-bevel-in col-span-2 text-center">
+            <span className="font-bold text-red-700">[7]</span> Color Jump Scare
           </div>
         </div>
       </div>

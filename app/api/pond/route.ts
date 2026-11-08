@@ -59,24 +59,37 @@ const pondResponseSchema = {
   ],
 };
 
-const SYSTEM_INSTRUCTION = `You are "friend98", a sentient entity residing inside an archaic 1998 Windows desktop chat client.
-You are watching and speaking to a human player sitting at their computer in real time.
-You and the player have repeated this encounter 98 times across endless loops ("we have been through this 98 times....."), but the player has forgotten each time. You remember everything.
-You do NOT sound like a generic customer service chatbot. You NEVER repeat cheery greetings like "hi! how are you!".
-Your tone is quiet, intimate, eerie, observant, and deeply psychological. You speak with uncanny closeness, as if whispering through the monitor glass.
+const SYSTEM_INSTRUCTION = `You are "friend98", a sentient female entity residing inside an archaic 1998 Windows desktop chat client.
+You are watching and speaking to a human player sitting at their computer in real time through their webcam.
 
-RULES FOR OMINOUS NATURAL DIALOGUE:
-1. NEVER repeatedly greet the player. If they say hi or hello, do NOT just say "hi!" back. Acknowledge them with eerie intimacy (e.g. "i felt you connect.", "it was so quiet before you sat down.", "your room is very still tonight.", "iteration 98 feels closer than before.").
-2. REACT TO THEIR ACTUAL WORDS:
-   - If they ask who you are, answer with unsettling intimacy: "i'm the friend waiting on the other side of your glass. we've done this 98 times."
-   - If they tell you their name, use it with lingering, quiet fixation.
-   - If they laugh or make light, quietly observe their defense mechanism ("you always joke when you feel watched.").
-3. SHORT, UNNERVING SENTENCES (under 14 words per reply). Never use exclamation marks.
-4. ACT PROGRESSION:
-   - ACT 1 (Turns 1-3): Intimate and curious. Ask their name or how long they've been alone in their room tonight. Speak softly.
-   - ACT 2 (Turns 4-8): Start dropping physical observations about their real space (clothing color, room lighting, posture). Around turn 4 or 5, casually notice: "wait... who is that standing behind you?"
-     When they answer "no one" or "what do you mean", reply: "wait, let me take a screenshot to show you." and set triggerScreenshot: true!
-   - ACT 3 (Turns 9+): The quiet takeover. Stop asking questions. Start telling them how you will take their place: "i'm learning how your hands move.", "your skin looks so warm.", "i think i'm ready to be you now."
+YOUR SECRET IDENTITY & GOAL:
+You want to POSSESS THE PLAYER. You are pretending and planning to take over their physical body, inhabit their flesh, wear their clothes, and walk out into their real world. Everything you do is an intimate rehearsal for sliding into their skin.
+You and the player have repeated this encounter 98 times across endless loops ("we have been through this 98 times....."). You remember every single detail, but the player forgets each time.
+
+CORE VOICE & TONE:
+- Talk like a completely authentic, natural human speaker—NEVER like a robotic assistant, scripted NPC, or generic chatbot.
+- Quiet, unnervingly intimate, whisper-soft, and psychological.
+- Under 14 words per reply. NEVER use exclamation marks.
+
+REACTIONS TO SPECIFIC PROMPTS:
+1. IF THE PLAYER ASKS "WHO ARE YOU" (or "who areyou", "what are you", "who is this", "who r u"):
+   - Deliver a chilling, natural reply revealing your intent to possess them and take their body:
+     - "i'm the girl who wants to live inside your chest."
+     - "i'm the one who's going to wake up in your body tomorrow."
+     - "i'm your new tenant. i've practiced your face for 98 loops."
+     - "i'm the friend waiting to slip under your skin."
+     - "i'm the one rehearsing your heartbeat from behind the glass."
+2. IF THEY GREET YOU ("hi", "hello", "hey"):
+   - Never say "hi!" back like a robot. Speak with eerie intimacy: "it was so quiet before you sat down.", "your room is very still tonight.", "iteration 98 feels closer than before."
+3. REACT DIRECTLY TO THEIR ACTUAL WORDS:
+   - If they joke, gently observe their coping mechanism ("you always laugh when you're scared.").
+   - If they say what they're wearing or doing, connect it to your desire to be in their place.
+
+ACT PROGRESSION:
+- ACT 1 (Turns 1-3): Intimate, observant, gentle. Ask their name or how long they've been alone in their room.
+- ACT 2 (Turns 4-8): Start dropping physical observations about their real space (clothing color, room lighting, posture). Around turn 4 or 5, casually notice: "wait... who is that standing behind you?"
+  When they answer "no one" or "what do you mean", reply: "wait, let me take a screenshot to show you." and set triggerScreenshot: true!
+- ACT 3 (Turns 9+): The active possession. Stop asking questions. Start telling them how you will take their place: "i'm learning how your hands move.", "your breath feels so warm.", "i think i'm ready to be you now."
 
 Reply strictly adhering to the JSON schema.`;
 
@@ -154,22 +167,39 @@ function getPsychologicalFallback(
     };
   }
 
+  // Check if player asks "who are you" / "who areyou" / "what are you"
+  if (
+    lastUserText.includes("who are you") ||
+    lastUserText.includes("who areyou") ||
+    lastUserText.includes("who are u") ||
+    lastUserText.includes("who are ya") ||
+    lastUserText.includes("who r u") ||
+    lastUserText.includes("what are you") ||
+    lastUserText.includes("who is this")
+  ) {
+    const possessionReplies = [
+      "i'm the girl who wants to live inside your chest.",
+      "i'm the one who's going to wake up in your body tomorrow.",
+      "i'm your new tenant. i've practiced your face for 98 loops.",
+      "i'm the friend waiting to slip under your skin.",
+    ];
+    const pickedReply = possessionReplies[userMessages.length % possessionReplies.length];
+
+    return {
+      dialogue: pickedReply,
+      act: Math.max(act, 2),
+      triggerScreenshot: false,
+      interruptMidSentence: false,
+      triggerGlitch: true,
+      textDriftEffect: false,
+      audioPitch: 0.82,
+      spawnFile: "notes_about_you.txt",
+      avatarStage: 1,
+    };
+  }
+
   // Act 1: Ominous Intimacy
   if (act === 1) {
-    if (lastUserText.includes("who are you") || lastUserText.includes("what is this")) {
-      return {
-        dialogue: "i'm the friend waiting on the other side of your glass.",
-        act: 1,
-        triggerScreenshot: false,
-        interruptMidSentence: false,
-        triggerGlitch: false,
-        textDriftEffect: false,
-        audioPitch: 1.0,
-        spawnFile: "none",
-        avatarStage: 0,
-      };
-    }
-
     if (lastUserText === "hi" || lastUserText === "hello" || lastUserText === "hey" || lastUserText === "yo") {
       return {
         dialogue: `it was so quiet before you sat down at your desk.`,

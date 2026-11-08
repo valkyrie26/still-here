@@ -14,9 +14,6 @@
   - [x] Added cycling creepy toast alerts.
 
 - [x] **3. Personality Engine (Gemini 3-Act System)**
-  - [x] Act 1 (warm, normal friend, asks name and mood, uses player's name).
-  - [x] Act 2 (subtle physical slips, multimodal detail awareness, anticipating, quietly correcting self).
-  - [x] Act 3 (stops asking, tells, mimics player syntax, "I think I'm ready to be you.").
   - [x] Server-side Gemini 3.5 Flash SDK in `app/api/pond/route.ts` with direct `.env` resolution.
 
 - [x] **4. Tension Thermostat**
@@ -34,27 +31,28 @@
   - [x] Avatar window close button `[X]` allows closing to return to chat.
 
 - [x] **8. Audio & Ending Climax**
-  - [x] Web Audio low ambient drone, procedural breathing, and sudden dead silence.
   - [x] 3-Click close attempt displays "there is no escape" before plunging into ending blackout.
+  - [x] Ending blackout displays "now we can be together forever."
 
 - [x] **9. "friend98" Opening Screen with Glitchy Text**
   - [x] Retro Windows 98 / BIOS boot opening screen with glitchy text ("we have been through this 98 times.....").
 
-- [x] **10. Face-Missing Easter Egg**
-  - [x] Monitored webcam telemetry for face absence (`hasDetectedFace === false`).
-  - [x] Fires creepy easter egg into chat after 3.2s of missing face: *"why hide your face, it's only me."* with typewriter sound.
+- [x] **10. Pixel Art Blue Duck with Yellow Beak**
+  - [x] Authentic 90s retro pixel graphics (`image-rendering: pixelated`) with eye blinks, cursor gaze tracking, and uncanny smile.
+  - [x] Duck window swells bigger and bigger on each `[X]` close attempt.
 
-- [x] **11. Ending Screen Dialog Change**
-  - [x] Updated ending blackout headline and dialogue sequence to: *"now we can be together forever."*
+- [x] **11. Face-Missing Easter Egg**
+  - [x] Triggers *"why hide your face, it's only me."* when player hides or steps away.
 
-- [x] **12. Growing Duck Window on [X] Clicks**
-  - [x] Each click on `[X]` expands `DuckWindow` scale progressively (`1.0 + windowCloseAttempts * 0.35`).
-  - [x] `Friend.exe` looms larger and larger over the desktop with every escape attempt.
+- [x] **12. Screen Color Change Random Scare**
+  - [x] Added CSS classes for sudden blood-red crimson wash (`.screen-color-blood`), photographic negative invert (`.screen-color-invert`), and corrupted amber decay (`.screen-color-corrupt`).
+  - [x] Implemented randomized scare trigger in tension loop with sound sting, sudden silence drop, and demo key `[7]`.
 
-- [x] **13. Pixel Art Blue Duck with Yellow Beak**
-  - [x] Built crisp 90s retro SVG pixel graphics (`image-rendering: pixelated`) replacing ASCII art.
-  - [x] Interactive expressions: blinking eyes and blush (Act 1), delayed cursor gaze tracking (Act 2), uncanny wide stare and stretched grin (Act 3), player webcam morph (Ending).
+- [x] **13. Natural Creepy Possession Personality**
+  - [x] Updated Gemini system prompt: she pretends and schemes to possess the player's physical body and wear their skin.
+  - [x] Delivers natural, creepy possession answers when asked "who are you" / "who areyou" / "what are you".
+  - [x] Updated psychological fallback engine to match.
 
 - [x] **14. Final Build Verification & Push**
   - [x] Production build verified (`npm run build` succeeds cleanly with 0 errors).
-  - [x] Committed and pushed to `origin main`.
+  - [x] Stage, commit, and push to GitHub `origin main`.
