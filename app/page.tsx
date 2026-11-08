@@ -236,8 +236,15 @@ export default function Home() {
     setPermissionsGranted(true);
   };
 
-  // Close attempt handler: in ending or high tension, [X] refuses and buzzes!
+  // Close attempt handler: in ending or high tension, [X] refuses on main chat!
   const handleWindowCloseAttempt = (windowName: "chat" | "polaroid" | "avatar") => {
+    // Polaroid and Avatar mirror can ALWAYS be closed cleanly!
+    if (windowName === "avatar" || windowName === "polaroid") {
+      setActiveWindows((prev) => ({ ...prev, [windowName]: false }));
+      return;
+    }
+
+    // Only the main chat window refuses to close during the takeover / ending!
     if (isEnding || act === 3) {
       soundEngine.playKeystroke(0.35);
       setErrorMessage("ACCESS RESTRICTED: The daemon cannot be closed during active bodily transfer.");
@@ -250,6 +257,11 @@ export default function Home() {
   // Fixed Ending: No Escape Sequence
   const triggerEndingClimax = () => {
     setIsEnding(true);
+    // Dismiss any sub-windows so the void takes over cleanly
+    setActiveWindows({ chat: false, polaroid: false, avatar: false });
+    setActiveDesktopFile(null);
+    setErrorDialogOpen(false);
+
     soundEngine.triggerSuddenSilence(3000);
     soundEngine.playGlitchSting();
 

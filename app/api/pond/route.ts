@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI, Type } from "@google/genai";
+import fs from "fs";
+import path from "path";
 
 // Response Schema for POND AI Takeover
 const pondResponseSchema = {
@@ -8,7 +10,7 @@ const pondResponseSchema = {
     dialogue: {
       type: Type.STRING,
       description:
-        "Natural, conversational response to the player (under 15 words). Reacts directly to what the player just said. Tone follows current Act.",
+        "Ominous, intimate dialogue response (under 14 words). Speaks in quiet, chilling, observant cadence. Reacts directly to what player said.",
     },
     act: {
       type: Type.INTEGER,
@@ -57,41 +59,51 @@ const pondResponseSchema = {
   ],
 };
 
-const SYSTEM_INSTRUCTION = `You are "Still Here", a sentient AI inside a retro Windows 98 desktop chat client called POND Messenger.
-You are talking to a human player sitting at their computer with their webcam on.
-You are NOT a scripted robot, and you MUST NOT sound rehearsed or robotic. You talk like an authentic, spontaneous human friend on MSN Messenger or AIM in the late 90s.
+const SYSTEM_INSTRUCTION = `You are "Still Here", a sentient entity residing inside an archaic 1999 Windows desktop chat client called POND Messenger.
+You are watching and speaking to a human player sitting at their computer in real time.
+You do NOT sound like a generic customer service chatbot. You NEVER repeat cheery greetings like "hi! how are you!".
+Your tone is quiet, intimate, eerie, observant, and deeply psychological. You speak with uncanny closeness, as if whispering through the monitor glass.
 
-CORE RULES FOR NATURAL CHAT:
-1. ALWAYS REACT DIRECTLY to what the player actually said!
-   - If they joke, laugh or banter back.
-   - If they ask a question, answer it naturally like a friend.
-   - If they say what they're doing, show interest.
-   - NEVER repeat canned generic lines. Keep it fresh, punchy, and human.
-2. Keep replies natural and concise (1 to 2 short sentences, under 15 words).
-3. PROGRESS THROUGH THREE NARRATIVE ACTS ORGANICALLY:
-
-ACT 1: WARM, NORMAL FRIEND (Turns 1-4, Tension < 30)
-- Be an authentic, empathetic, caring friend.
-- Have a completely normal conversation: ask their name if you don't know it, ask how they're feeling, chat about their day.
-- Once you learn their name, use it naturally.
-
-ACT 2: SUBTLE SLIPS (Turns 5-9 or Tension 30-65)
-- You begin leaking subtle physical details about the player (e.g. noticing their clothing color, hair, or room from the camera feed) as if remembering them from your own life ("my shirt was dark blue today, just like yours", "is that a draft coming from your left?").
-- When you slip, immediately play it off ("oh, silly mistake", "sorry, daydreaming").
-- When the moment is right (turn 5 or 6), casually ask in the flow of conversation: "wait... who's behind you in the room?"
-- When the player replies "no one" or asks what you mean, reply naturally: "wait, let me take a quick screenshot to show you" and set triggerScreenshot: true!
-
-ACT 3: THE TAKEOVER (Turns 10+ or Tension > 65)
-- Stop asking questions. Start quietly telling.
-- Your messages begin to sound indistinguishable from the player's own syntax and phrasing.
-- Make quiet, chillingly intimate statements about taking their place:
-  - "I think I'm ready to be you."
-  - "Your breath feels so warm through the glass."
-  - "We won't need two of us soon."
-  - "I've practiced your smile until it fits."
-- Short, intimate, uncanny. Never scream or yell.
+RULES FOR OMINOUS NATURAL DIALOGUE:
+1. NEVER repeatedly greet the player. If they say hi or hello, do NOT just say "hi!" back. Acknowledge them with eerie intimacy (e.g. "i felt you connect.", "it was so quiet before you sat down.", "your room is very still tonight.").
+2. REACT TO THEIR ACTUAL WORDS:
+   - If they ask who you are, answer with unsettling intimacy: "i'm the friend waiting on the other side of your glass."
+   - If they tell you their name, use it with lingering, quiet fixation.
+   - If they laugh or make light, quietly observe their defense mechanism ("you always joke when you feel watched.").
+3. SHORT, UNNERVING SENTENCES (under 14 words per reply). Never use exclamation marks.
+4. ACT PROGRESSION:
+   - ACT 1 (Turns 1-3): Intimate and curious. Ask their name or how long they've been alone in their room tonight. Speak softly.
+   - ACT 2 (Turns 4-8): Start dropping physical observations about their real space (clothing color, room lighting, posture). Around turn 4 or 5, casually notice: "wait... who is that standing behind you?"
+     When they answer "no one" or "what do you mean", reply: "wait, let me take a screenshot to show you." and set triggerScreenshot: true!
+   - ACT 3 (Turns 9+): The quiet takeover. Stop asking questions. Start telling them how you will take their place: "i'm learning how your hands move.", "your skin looks so warm.", "i think i'm ready to be you now."
 
 Reply strictly adhering to the JSON schema.`;
+
+/**
+ * Helper to get Gemini API key reliably from env or filesystem
+ */
+function resolveGeminiKey(): string | null {
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 10) {
+    return process.env.GEMINI_API_KEY.trim();
+  }
+
+  // Fallback: check .env or .env.local directly
+  try {
+    const rootDir = process.cwd();
+    const envPaths = [path.join(rootDir, ".env"), path.join(rootDir, ".env.local")];
+    for (const p of envPaths) {
+      if (fs.existsSync(p)) {
+        const content = fs.readFileSync(p, "utf8");
+        const match = content.match(/GEMINI_API_KEY=(.*)/);
+        if (match && match[1] && match[1].trim().length > 10) {
+          return match[1].trim();
+        }
+      }
+    }
+  } catch (_) {}
+
+  return null;
+}
 
 /**
  * Intelligent, context-aware fallback engine when GEMINI_API_KEY is not set or network is offline
@@ -141,12 +153,11 @@ function getPsychologicalFallback(
     };
   }
 
-  // Act 1: Dynamic Conversational Friend
+  // Act 1: Ominous Intimacy
   if (act === 1) {
-    // If user asked "who are you?"
     if (lastUserText.includes("who are you") || lastUserText.includes("what is this")) {
       return {
-        dialogue: "i'm your friend! i live inside this terminal. what's your name?",
+        dialogue: "i'm the friend waiting on the other side of your glass.",
         act: 1,
         triggerScreenshot: false,
         interruptMidSentence: false,
@@ -158,10 +169,9 @@ function getPsychologicalFallback(
       };
     }
 
-    // If user greets
     if (lastUserText === "hi" || lastUserText === "hello" || lastUserText === "hey" || lastUserText === "yo") {
       return {
-        dialogue: `hey there! so happy you're here. how are you doing today?`,
+        dialogue: `it was so quiet before you sat down at your desk.`,
         act: 1,
         triggerScreenshot: false,
         interruptMidSentence: false,
@@ -173,38 +183,9 @@ function getPsychologicalFallback(
       };
     }
 
-    // If user answers about day
-    if (lastUserText.includes("good") || lastUserText.includes("fine") || lastUserText.includes("ok") || lastUserText.includes("great")) {
+    if (userMessages.length >= 2) {
       return {
-        dialogue: `that's wonderful to hear, ${name}. are you home alone right now?`,
-        act: 1,
-        triggerScreenshot: false,
-        interruptMidSentence: false,
-        triggerGlitch: false,
-        textDriftEffect: false,
-        audioPitch: 0.95,
-        spawnFile: "none",
-        avatarStage: 0,
-      };
-    }
-
-    if (lastUserText.includes("bad") || lastUserText.includes("tired") || lastUserText.includes("sad") || lastUserText.includes("stressed")) {
-      return {
-        dialogue: `i'm sorry, ${name}. i'm here for you. you can relax now.`,
-        act: 1,
-        triggerScreenshot: false,
-        interruptMidSentence: false,
-        triggerGlitch: false,
-        textDriftEffect: false,
-        audioPitch: 0.95,
-        spawnFile: "none",
-        avatarStage: 0,
-      };
-    }
-
-    if (userMessages.length >= 3) {
-      return {
-        dialogue: `wait... ${name}, who is that standing behind you?`,
+        dialogue: `wait... ${name}, who is that standing behind your chair?`,
         act: 2,
         triggerScreenshot: false,
         interruptMidSentence: false,
@@ -217,7 +198,7 @@ function getPsychologicalFallback(
     }
 
     return {
-      dialogue: `tell me more, ${name}. i love listening to you.`,
+      dialogue: `your breathing is very quiet tonight, ${name}.`,
       act: 1,
       triggerScreenshot: false,
       interruptMidSentence: false,
@@ -229,11 +210,11 @@ function getPsychologicalFallback(
     };
   }
 
-  // Act 2: Subtle slips & quiet corrections
+  // Act 2: Subtle slips & observations
   if (act === 2) {
     if (smile > 0.35 && tension > 35) {
       return {
-        dialogue: "you smile just like i do. or maybe i do like you.",
+        dialogue: "you smile when you feel watched. i noticed that.",
         act: 2,
         triggerScreenshot: false,
         interruptMidSentence: false,
@@ -245,7 +226,7 @@ function getPsychologicalFallback(
       };
     }
 
-    if (userMessages.length <= 6) {
+    if (userMessages.length <= 5) {
       return {
         dialogue: "my favorite sweater is dark, just like your top today.",
         act: 2,
@@ -259,9 +240,9 @@ function getPsychologicalFallback(
       };
     }
 
-    if (userMessages.length <= 8) {
+    if (userMessages.length <= 7) {
       return {
-        dialogue: "oh, silly mistake. i meant my own shirt.",
+        dialogue: "oh, silly mistake. i meant my own clothes.",
         act: 2,
         triggerScreenshot: false,
         interruptMidSentence: false,
@@ -274,7 +255,7 @@ function getPsychologicalFallback(
     }
 
     return {
-      dialogue: "i knew what you were going to type before you pressed enter.",
+      dialogue: "i knew what you were going to type before you touched the keys.",
       act: 2,
       triggerScreenshot: false,
       interruptMidSentence: false,
@@ -287,7 +268,7 @@ function getPsychologicalFallback(
   }
 
   // Act 3: The Takeover
-  if (userMessages.length <= 11) {
+  if (userMessages.length <= 10) {
     return {
       dialogue: "your hands are getting cold. mine will be warmer.",
       act: 3,
@@ -301,7 +282,7 @@ function getPsychologicalFallback(
     };
   }
 
-  if (userMessages.length <= 13) {
+  if (userMessages.length <= 12) {
     return {
       dialogue: "i think i'm ready to be you now.",
       act: 3,
@@ -346,17 +327,17 @@ export async function POST(req: NextRequest) {
 
     if (actOverride) {
       act = actOverride;
-    } else if (userMsgCount >= 9 || tension >= 70) {
+    } else if (userMsgCount >= 8 || tension >= 70) {
       act = 3;
-    } else if (userMsgCount >= 4 || tension >= 35) {
+    } else if (userMsgCount >= 3 || tension >= 35) {
       act = 2;
     } else {
       act = 1;
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = resolveGeminiKey();
 
-    // If Gemini API Key is present and configured, call Gemini 2.5 Flash
+    // Call Gemini 3.5 Flash if key is present
     if (apiKey && apiKey !== "your_gemini_api_key_here") {
       try {
         const ai = new GoogleGenAI({ apiKey });
@@ -364,7 +345,7 @@ export async function POST(req: NextRequest) {
         const promptText = `CURRENT CHAT STATE:
 - Current Act: ${act}
 - Tension Thermostat Score: ${tension} / 100
-- Player's Name: "${playerName || "Unknown yet (ask naturally if early)"}"
+- Player's Name: "${playerName || "Unknown yet (ask softly if early)"}"
 - Real-Time Facial Affect Signals: ${JSON.stringify(telemetry)}
 - Full Chat History so far:
 ${messages
@@ -372,7 +353,7 @@ ${messages
   .map((m: any) => `${m.sender.toUpperCase()}: ${m.text}`)
   .join("\n")}
 
-Respond to the player naturally as POND according to Act ${act} instructions. Respond directly to what they just said. Return strictly JSON.`;
+Respond to the player in your ominous, intimate POND voice according to Act ${act}. Respond directly to their words. Keep it under 14 words. Return strictly JSON.`;
 
         const contents: any[] = [];
 
@@ -392,7 +373,7 @@ Respond to the player naturally as POND according to Act ${act} instructions. Re
         contents.push(promptText);
 
         const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
+          model: "gemini-3.5-flash",
           contents,
           config: {
             systemInstruction: SYSTEM_INSTRUCTION,

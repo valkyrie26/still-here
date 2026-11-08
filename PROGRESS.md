@@ -62,6 +62,8 @@
   - [x] Swaps frames reactively using `tension` and `act`.
   - [x] Visible on screen from the very first scene.
 
-- [x] **11. Final Verification & User Guide**
-  - [x] Production build verified (`npm run build` succeeds with 0 errors).
-  - [x] Full step-by-step walkthrough documented.
+- [x] **11. Smile Warp, Ending Progression & Gemini 3.5 Polish**
+  - [x] Confined uncanny warp deformation strictly to the mouth region (sharp upward mouth corner lift, zero downward lower-lip dip, zero eye distortion).
+  - [x] Avatar window `[X]` close button fixed so it can be dismissed cleanly; ending climax auto-dismisses sub-windows for unobstructed blackout.
+  - [x] Upgraded Gemini engine to `gemini-3.5-flash` with direct `.env` server resolution; removed canned "hi" greetings in favor of atmospheric, intimate psychological responses.
+  - [x] Production build verified (`npm run build` succeeds cleanly with 0 errors).

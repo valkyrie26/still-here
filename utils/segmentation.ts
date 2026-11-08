@@ -50,11 +50,10 @@ export async function initSelfieSegmenter() {
 
 /**
  * Applies the dramatic "Smile" movie uncanny grin warp:
- * - Extends the mouth edges/corners far UPWARDS towards cheekbones/ears
- * - Stretches the mouth horizontally wide across cheeks
- * - Does NOT pull lower lips downwards (preserves natural lip/chin contour)
- * - Centers eyes facing directly forward at camera lens
- * - Bilinear interpolation for smooth, photo-realistic blending
+ * - MODIFIES STRICTLY AND ONLY THE MOUTH. Eyes, nose, cheeks, chin are 100% untouched.
+ * - Extends the mouth edges/corners far UPWARDS towards cheekbones.
+ * - Does NOT pull lower lips downwards (zero downward dip).
+ * - Bilinear interpolation for crisp, photo-realistic blending.
  */
 export function applySmileMovieWarp(
   canvas: HTMLCanvasElement,
@@ -69,93 +68,72 @@ export function applySmileMovieWarp(
   const src = new Uint8ClampedArray(imgData.data);
   const dst = imgData.data;
 
-  // Compute anatomical coordinates from faceBox
+  // Compute anatomical face coordinates
   const cx = (faceBox?.centerX ?? 0.5) * width;
   const cy = (faceBox?.centerY ?? 0.45) * height;
   const fw = (faceBox?.faceWidth ?? 0.32) * width;
 
-  // Mouth center: located strictly below the nose
+  // STRICT MOUTH BOUNDING BOX:
+  // Mouth center is ~58% of faceWidth below face center
   const mouthX = cx;
-  const mouthY = Math.min(height * 0.86, cy + fw * 0.62);
-  const mouthRadiusX = fw * 0.74; // Wide reach cheek-to-cheek
-  const mouthRadiusY = fw * 0.44;
+  const mouthY = Math.min(height * 0.84, cy + fw * 0.58);
+  const mouthRadiusX = fw * 0.42; // Width of mouth influence
+  const mouthRadiusY = fw * 0.18; // Height of mouth influence
 
-  // Eye centers for forward gaze locking
-  const eyeLeftX = cx - fw * 0.34;
-  const eyeRightX = cx + fw * 0.34;
-  const eyeY = cy - fw * 0.12;
-  const eyeRadius = fw * 0.18;
+  // Vertical bounds: completely below nose base and above chin crease
+  const yMin = Math.max(0, Math.floor(mouthY - mouthRadiusY * 1.1));
+  const yMax = Math.min(height - 1, Math.ceil(mouthY + mouthRadiusY * 1.1));
+  const xMin = Math.max(0, Math.floor(mouthX - mouthRadiusX * 1.15));
+  const xMax = Math.min(width - 1, Math.ceil(mouthX + mouthRadiusX * 1.15));
 
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      let srcX = x;
-      let srcY = y;
+  for (let y = yMin; y <= yMax; y++) {
+    for (let x = xMin; x <= xMax; x++) {
+      const normX = (x - mouthX) / mouthRadiusX;
+      const normY = (y - mouthY) / mouthRadiusY;
+      const distSq = normX * normX + normY * normY;
 
-      // 1. FORWARD EYE GAZE LOCKING:
-      // Subtle gaze-centering so both eyes lock directly on camera forward
-      const dEyeLeft = Math.hypot(x - eyeLeftX, y - eyeY);
-      if (dEyeLeft < eyeRadius) {
-        const eyeWeight = (1 - dEyeLeft / eyeRadius);
-        // Gently pull pupil towards optical center of socket
-        srcX = x + (eyeLeftX - x) * 0.12 * eyeWeight;
-      }
-      const dEyeRight = Math.hypot(x - eyeRightX, y - eyeY);
-      if (dEyeRight < eyeRadius) {
-        const eyeWeight = (1 - dEyeRight / eyeRadius);
-        srcX = x + (eyeRightX - x) * 0.12 * eyeWeight;
-      }
+      if (distSq < 1.0) {
+        // Smooth falloff from center to edge of mouth box
+        const weight = (1 - distSq) * (1 - distSq);
 
-      // 2. "SMILE" MOVIE GRIN WARP (CORNER LIFT ONLY, NO LOWER LIP DIP):
-      // Only apply to lower face below the nose line (y > cy + fw * 0.28)
-      if (y > cy + fw * 0.28) {
-        const normX = (x - mouthX) / mouthRadiusX;
-        const normY = (y - mouthY) / mouthRadiusY;
-        const distSq = normX * normX + normY * normY;
+        // ONLY LIFT CORNERS UPWARDS:
+        // absX is 0 at center lips, 1 at mouth corners
+        const absX = Math.abs(normX);
+        const cornerFactor = Math.pow(absX, 1.5);
 
-        if (distSq < 1.0) {
-          // Smooth falloff from mouth center
-          const weight = (1 - distSq) * (1 - distSq);
+        // Strong upward lift at corners (up to ~35-45px depending on face size)
+        const maxUpLift = mouthRadiusY * 1.45;
+        const upLift = cornerFactor * maxUpLift * weight;
 
-          // Focus purely on outer corners/edges (|normX| > 0.15)
-          const absX = Math.abs(normX);
-          const cornerFactor = Math.pow(absX, 1.35); // 0 at center lips, accelerates to 1 at cheek corners
+        // Subtle horizontal widening of the corners
+        const stretchX = 0.28 * weight * (x - mouthX);
+        const srcX = x - stretchX;
 
-          // DRAMATIC UPWARD CORNER LIFT:
-          // Pulls the outer edges far up towards cheekbones
-          const maxLift = mouthRadiusY * 1.35; // Pronounced upward rise
-          const upLift = cornerFactor * maxLift * weight;
+        // INVERSE MAPPING: To lift corners UP, sample from lower down (y + upLift)
+        // Center lips have cornerFactor = 0, so NO DOWNWARD OR UPWARD PULL at center!
+        const srcY = y + upLift;
 
-          // HORIZONTAL MOUTH WIDENING:
-          // Stretches mouth corners outward toward ears
-          const stretchFactor = 0.35 * weight;
-          srcX = mouthX + (x - mouthX) * (1 - stretchFactor);
+        // Bilinear interpolation
+        const x0 = Math.max(0, Math.min(width - 1, Math.floor(srcX)));
+        const x1 = Math.max(0, Math.min(width - 1, x0 + 1));
+        const y0 = Math.max(0, Math.min(height - 1, Math.floor(srcY)));
+        const y1 = Math.max(0, Math.min(height - 1, y0 + 1));
 
-          // INVERSE MAPPING: To pull pixels UP, sample from lower down (y + upLift)
-          // NO lower lip dip! Central lips (absX < 0.2) receive 0 upward lift and 0 downward dip
-          srcY = y + upLift;
+        const fx = srcX - Math.floor(srcX);
+        const fy = srcY - Math.floor(srcY);
+
+        const i00 = (y0 * width + x0) * 4;
+        const i10 = (y0 * width + x1) * 4;
+        const i01 = (y1 * width + x0) * 4;
+        const i11 = (y1 * width + x1) * 4;
+
+        const targetIdx = (y * width + x) * 4;
+
+        for (let c = 0; c < 4; c++) {
+          const top = src[i00 + c] * (1 - fx) + src[i10 + c] * fx;
+          const bot = src[i01 + c] * (1 - fx) + src[i11 + c] * fx;
+          dst[targetIdx + c] = Math.round(top * (1 - fy) + bot * fy);
         }
-      }
-
-      // Bilinear interpolation for crisp, photo-realistic blending
-      const x0 = Math.max(0, Math.min(width - 1, Math.floor(srcX)));
-      const x1 = Math.max(0, Math.min(width - 1, x0 + 1));
-      const y0 = Math.max(0, Math.min(height - 1, Math.floor(srcY)));
-      const y1 = Math.max(0, Math.min(height - 1, y0 + 1));
-
-      const fx = srcX - Math.floor(srcX);
-      const fy = srcY - Math.floor(srcY);
-
-      const i00 = (y0 * width + x0) * 4;
-      const i10 = (y0 * width + x1) * 4;
-      const i01 = (y1 * width + x0) * 4;
-      const i11 = (y1 * width + x1) * 4;
-
-      const targetIdx = (y * width + x) * 4;
-
-      for (let c = 0; c < 4; c++) {
-        const top = src[i00 + c] * (1 - fx) + src[i10 + c] * fx;
-        const bot = src[i01 + c] * (1 - fx) + src[i11 + c] * fx;
-        dst[targetIdx + c] = Math.round(top * (1 - fy) + bot * fy);
       }
     }
   }
@@ -340,7 +318,7 @@ export async function compositeLayeredScreenshot(
   // LAYER 3: Person Foreground Cutout (Head & Shoulders ON TOP)
   const playerCutout = await extractPlayerForegroundCutout(videoCanvas, options.faceBox);
   if (playerCutout) {
-    // Apply uncanny "Smile" movie grin warp to player cutout
+    // Apply uncanny "Smile" movie grin warp to player cutout (mouth only)
     applySmileMovieWarp(playerCutout, options.faceBox);
 
     ctx.save();
