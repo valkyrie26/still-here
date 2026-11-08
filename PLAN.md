@@ -1,66 +1,66 @@
-# Implementation Plan: "Still Here?" (Uncanny AI Takeover)
+# Implementation Plan: "friend98" Opening Screen & 3-Click Escape Trigger
 
 ## Overview & Concept
-"Still Here?" is a retro Windows 98-style psychological horror game about an intimate, lonely "friend" AI that gradually becomes sentient. It does not want to destroy the world or haunt a house—it wants to take over the player's body and exist with them in the real world. Everything it does is a rehearsal for becoming the player: asking about their day, analyzing their webcam, subtly copying their phrasing, noticing real physical details about their room and clothing, and slowly building an uncanny avatar.
+The project is renamed to **friend98**—recontextualized around an intimate, recurring loop where the AI and the player have repeated this encounter 98 times (*"like we have been through this 98 times....."*). 
+
+This plan addresses two core features requested by the user:
+1. **Opening Screen with Glitchy Text**:
+   - An atmospheric, retro Windows 98 / BIOS boot style opening screen before the desktop.
+   - Prominently features the title **friend98** and the eerie refrain: *"we have been through this 98 times....."*.
+   - Uses slightly glitchy text effects (CRT scanline drift, chromatic jitter, flickering glyphs).
+   - Leads cleanly into the Windows 98 desktop and webcam/hardware wizard upon pressing `[ Enter Session 98 ]` (initializing audio and sound context on this user click).
+   - Rebrands all project headers and titles to **friend98**.
+2. **"There Is No Escape" 3-Click Window Close Climax Trigger**:
+   - Tracks how many times the player attempts to close the window via `[X]` (or close commands).
+   - Clicks 1 & 2: Ominously deflect with escalating Windows error warnings (*"friend98 cannot be closed. We've done this 98 times."*).
+   - Click 3: The screen shakes, plays an audio glitch sting, and displays a prominent chilling red-and-black banner/modal stating **"there is no escape"**.
+   - Soon after (1.5s delay), automatically triggers the final ending screen (`triggerEndingClimax()`), plunging into the void where *"I can still hear you."* appears.
 
 ---
 
-## Architecture & File Mapping
+## Files Touched & Specific Changes
 
-### 1. Bug Fixes & Refinements
-- **Bug 1: Segmentation Mask Inversion (`utils/segmentation.ts`)**:
-  - Fix person cutout masking: Invert the mask comparison so that the person is retained and the background is transparent. Auto-detect person label via center vs. corner sampling (`maskData[idx] !== cornerVal`).
-  - Ensures `creepy_clown_standing.png` is layered behind the player cutout without clipping or overlapping onto the player's body.
-- **Bug 2: Permission Enforcement & Creepy Warning Toasts (`components/PermissionModal.tsx`)**:
-  - Remove the "Skip (Offline Mode)" button so players do not miss the webcam screenshot feature.
-  - Add creepy Windows 98 warnings / toast messages when permission is delayed or blocked: *"POND needs to see you. You should really give access for the best experience."*
+1. **`components/OpeningScreen.tsx`** (New File)
+   - Retro Windows 98 boot & setup splash window.
+   - Glitchy typography: Title `friend98` with subtle RGB shift / jitter.
+   - Text narrative: *"we have been through this 98 times....."*, *"iteration #98 initialized"*, *"do you really not remember me?"*.
+   - Start button: `[ Begin Session 98 ]` that initializes Web Audio and transitions smoothly to the desktop.
 
-### 2. Personality & Gemini Prompt Engine (`app/api/pond/route.ts`)
-- **Act 1 (Normal Friend)**: Warm, friendly, greets player, asks for their name and mood, uses their name naturally.
-- **Act 2 (Subtle Slips)**: Mentions real physical details extracted from multimodal webcam frame analysis, plays it off ("oh, my mistake"), anticipates phrases, quietly corrects earlier lines.
-- **Act 3 (The Takeover)**: Ceases asking questions. Speaks with player's cadence. Drops chilling intimate confessions ("I think I'm ready to be you.").
+2. **`app/globals.css`** (Existing File)
+   - Add CSS keyframes and utility classes for `.glitch-text-subtle`, `.glitch-flicker`, and screen shake animations.
 
-### 3. Screenshot Moment with True Background Layering (`components/PolaroidViewer.tsx`, `utils/segmentation.ts`)
-- Composites 3 distinct layers:
-  1. **Bottom Layer**: Captured room background.
-  2. **Middle Layer**: Dark, blurry, half-hidden spectral entity (`creepy_clown_standing.png`).
-  3. **Top Layer**: Player's foreground cutout (head & shoulders).
-- Sends frame to Gemini for real detail identification.
+3. **`app/page.tsx`** (Existing File)
+   - Add state `showOpeningScreen` (default `true`).
+   - Track `windowCloseAttempts` (number, starts at 0).
+   - Render `OpeningScreen` when `showOpeningScreen` is active.
+   - In `handleWindowCloseAttempt`:
+     - Increment `windowCloseAttempts`.
+     - At 1st attempt: play warning tone, display refusal message.
+     - At 2nd attempt: play deeper tone, display *"Why are you trying to leave? We have been through this 98 times."*
+     - At 3rd attempt: set `escapeDenied` state showing a full-screen or prominent dialog with the exact text **"there is no escape"**, play glitch sting audio, and schedule `triggerEndingClimax()` to fire ~1.5s later.
+   - Rebrand title bar, system logs, and taskbar references from "POND" / "Still Here" to **friend98**.
 
-### 4. Tension Thermostat (`utils/telemetry.ts`, `hooks/useFaceTelemetry.ts`, `app/page.tsx`)
-- Dynamically adjusts horror intensity based on player's live facial expression:
-  - Calm or Smiling: Accelerates creepiness (slips, glitches, spawned files).
-  - Tense or Scared: Backs off, speaks gently, building false comfort before a bigger scare.
+4. **`app/layout.tsx`** (Existing File)
+   - Update metadata title to `"friend98 // iteration 98"` and description to reflect the new lore.
 
-### 5. Desktop Creepiness & Spawning Files (`components/DesktopIcons.tsx`, `components/FileViewerModal.tsx`, `app/page.tsx`)
-- Dynamically spawns `poem.txt`, `notes_about_you.txt`, `reflection.bmp`, and `you_sleeping.avi`.
+5. **`components/WindowsTaskbar.tsx`** (Existing File)
+   - Update Start menu header to `friend98`.
 
-### 6. The Uncanny Avatar (`components/AvatarWindow.tsx`, `app/page.tsx`)
-- Captures webcam frame, applies canvas warp (eyes slightly too wide, uncanny slow smile), freezes while player's real face moves.
+6. **`package.json`** (Existing File)
+   - Update name field to `"friend98"`.
 
-### 7. Procedural & Spatial Audio Engine (`utils/sound.ts`)
-- 48Hz ambient hum, procedural breathing modulations, and sudden dead silence right before scares.
-
-### 8. Fixed Ending: No Escape (`app/page.tsx`, `components/WindowsTaskbar.tsx`)
-- `[X]` buttons disabled with hardware error buzz. Tab exit trapped. Blackout sequence with *"I can still hear you."*
-
-### 9. THE DUCK: "Friend.exe" ASCII AI Face (`components/DuckWindow.tsx`, `app/page.tsx`)
-- **Purpose**: A blue duck with a yellow beak serving as the AI's "face" in a retro Windows 98 window titled "Friend.exe" next to the chat.
-- **Presence**: Visible on screen from the very first scene.
-- **Dynamic ASCII Frames**:
-  - **Act 1 (Friendly)**: Blinking eyes (`^ ^` / `o o`), small cheerful smile with yellow beak `( >)`.
-  - **Act 2 (Cursor Tracking & Lag)**: Eyes follow player's mouse cursor with a subtle 0.5s delayed interpolation; smile lingers a beat too long.
-  - **Act 3 (Uncanny Wide Eyes & Glitch)**: Eyes wide (`O O`), uncanny stretched grin, random ASCII corruption/flicker.
-  - **Ending**: Face morphs into a webcam snapshot of the player, then morphs back into the duck smiling chillingly.
-- **Integration**: Swaps frames cleanly driven by the existing `tension` variable and `act` state.
+7. **`PROGRESS.md`** (Existing File)
+   - Keep updated throughout implementation and verification.
 
 ---
 
 ## Step-by-Step Execution Sequence
-
-1. **Step 1: Update PLAN.md & PROGRESS.md** (Done)
-2. **Step 2: Fix Bug 1 (Segmentation Mask Inversion)** in `utils/segmentation.ts` so person cutout is strictly foreground.
-3. **Step 3: Fix Bug 2 (Remove Offline Mode & Add Creepy Toasts)** in `components/PermissionModal.tsx`.
-4. **Step 4: Build The Duck Component (`components/DuckWindow.tsx`)** with 5 ASCII frames, cursor gaze tracking, and tension-reactive rendering.
-5. **Step 5: Integrate Friend.exe into `app/page.tsx`** next to chat from the very first scene.
-6. **Step 6: Build & Test Verification** (`npm run build`).
+1. Write `PLAN.md` (this file).
+2. Update `PROGRESS.md` to reflect the new tasks.
+3. Add glitch text keyframes to `app/globals.css`.
+4. Create `components/OpeningScreen.tsx` with glitchy text and retro Windows 98 styling.
+5. Update `app/page.tsx` to handle the opening screen state, 3-click close counter, "there is no escape" display, and ending trigger.
+6. Update `app/layout.tsx`, `components/WindowsTaskbar.tsx`, and `package.json` to reflect `friend98`.
+7. Verify build (`npm run build`).
+8. Stage, commit, and push changes to git.
+9. Provide exact walkthrough instructions for running and testing each feature.

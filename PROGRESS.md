@@ -1,6 +1,6 @@
-# Progress Tracking: "Still Here?" (Uncanny AI Takeover)
+# Progress Tracking: "friend98" (Uncanny AI Takeover)
 
-## Status: ALL FEATURES & BUGFIXES COMPLETE & VERIFIED
+## Status: ALL FEATURES IMPLEMENTED & PRODUCTION VERIFIED
 
 ### Checklist
 
@@ -11,59 +11,55 @@
 - [x] **2. Permission Modal & Bug 2 Fix**
   - [x] Windows 98 Hardware Setup Wizard asking clearly for Camera and Microphone access.
   - [x] Removed "Skip (Offline Mode)" button so players never miss the signature webcam screenshot.
-  - [x] Added cycling creepy toast alerts ("pond needs to see who it is speaking to...", "it is dark in here without your camera...").
+  - [x] Added cycling creepy toast alerts ("it is dark in here without your camera...").
 
 - [x] **3. Personality Engine (Gemini 3-Act System)**
   - [x] Act 1 (warm, normal friend, asks name and mood, uses player's name).
   - [x] Act 2 (subtle physical slips, multimodal detail awareness, anticipating, quietly correcting self).
   - [x] Act 3 (stops asking, tells, mimics player syntax, "I think I'm ready to be you.").
-  - [x] Server-side only Gemini 2.5 Flash SDK in `app/api/pond/route.ts` with structured JSON schema and psychological fallback engine.
+  - [x] Server-side Gemini 3.5 Flash SDK in `app/api/pond/route.ts` with direct `.env` resolution.
 
 - [x] **4. Tension Thermostat**
   - [x] Dynamic tension score (0–100) evaluated every 1.5s via `updateTensionThermostat`.
-  - [x] Calm/smiling player increases creepiness (slips, glitches, spawning files).
-  - [x] Tense/scared player backs off and goes quiet, building false comfort before a bigger scare.
   - [x] Tension drives narrative Acts, screen darkening, audio pitch, and visual distortions.
 
 - [x] **5. Layered Screenshot Moment & Bug 1 Fix**
-  - [x] Scripted sequence: "who's behind you?" -> player: "no one" -> AI: "wait, I'll take a screenshot".
-  - [x] Fixed segmentation mask selection in `utils/segmentation.ts` via corner vs center contrast check so the player is strictly 100% opaque foreground.
+  - [x] Fixed segmentation mask selection in `utils/segmentation.ts` so person cutout is strictly foreground.
   - [x] Strict 3-layer compositing: Room Background -> Ghost Entity (`creepy_clown_standing.png`) -> Person Cutout ON TOP.
-  - [x] The ghost entity is physically BEHIND the player with zero clipping or overlay onto the player.
-  - [x] Captured frame is sent to `/api/pond` for Gemini multimodal detail observation (e.g. shirt color).
+  - [x] Ghost entity is physically BEHIND the player with zero clipping.
 
 - [x] **6. Desktop Creepiness & Spawning Files**
   - [x] Spawns `notes_about_you.txt`, `poem.txt`, `reflection.bmp`, and `you_sleeping.avi`.
   - [x] Built `components/FileViewerModal.tsx` for Notepad, Imaging, and Windows Media Player.
-  - [x] Screen fractures (`ScreenCrack`) and text drifting (`text-drift-fall`).
 
-- [x] **7. The Uncanny Avatar**
-  - [x] Built `components/AvatarWindow.tsx` applying canvas-based warp filter: eyes slightly too wide, uncanny slow grin.
-  - [x] Freezes the unnatural smiling avatar while the player's real face continues moving.
+- [x] **7. The Uncanny Avatar & Smile Warp**
+  - [x] Built `components/AvatarWindow.tsx` applying canvas warp.
+  - [x] Smile warp deformation strictly confined to mouth corners curling sharply upwards.
+  - [x] Avatar window close button `[X]` allows closing to return to chat.
 
 - [x] **8. Audio (Hum, Distant Breath, Sudden Silence)**
-  - [x] Low 48Hz ambient drone, procedural distant breathing, and dead-silence cutoff in `utils/sound.ts`.
-  - [x] Keystroke audio pitch shifts dynamically from crisp 1.0 down to dread-inducing 0.45.
-  - [x] Web Audio context initialized on first user click.
+  - [x] Web Audio low ambient drone, procedural breathing, and sudden dead silence.
 
 - [x] **9. Fixed Ending (No Escape)**
-  - [x] Climax sequence: window [X] buttons disabled, `window.onbeforeunload` trapped.
-  - [x] Blackout screen transition with "I can still hear you."
-  - [x] AI continues typing and talking into the void.
+  - [x] Blackout transition with "I can still hear you." and AI dialogue into the void.
 
-- [x] **10. THE DUCK: "Friend.exe" ASCII AI Face (FINAL PRIORITY)**
-  - [x] Created `components/DuckWindow.tsx` styled as a Windows 98 window titled "Friend.exe" positioned next to the chat.
-  - [x] Rendered blue duck with yellow beak in monospaced colored ASCII art.
-  - [x] 5 Dynamic ASCII frames:
-    - Act 1: Friendly, with blinking eyes and small smile.
-    - Act 2: Eyes follow cursor with 0.5s lag, smile stays a beat too long.
-    - Act 3: Eyes too wide, uncanny stretched grin, random ASCII glitch flicker.
-    - Ending: Duck morphs into player's webcam face, then back into smiling duck.
-  - [x] Swaps frames reactively using `tension` and `act`.
-  - [x] Visible on screen from the very first scene.
+- [x] **10. THE DUCK: "Friend.exe" ASCII AI Face**
+  - [x] Windows 98 window titled "Friend.exe" next to chat from the very first scene.
+  - [x] 5 Dynamic ASCII frames responding to tension and act.
 
-- [x] **11. Smile Warp, Ending Progression & Gemini 3.5 Polish**
-  - [x] Confined uncanny warp deformation strictly to the mouth region (sharp upward mouth corner lift, zero downward lower-lip dip, zero eye distortion).
-  - [x] Avatar window `[X]` close button fixed so it can be dismissed cleanly; ending climax auto-dismisses sub-windows for unobstructed blackout.
-  - [x] Upgraded Gemini engine to `gemini-3.5-flash` with direct `.env` server resolution; removed canned "hi" greetings in favor of atmospheric, intimate psychological responses.
+- [x] **11. "friend98" Opening Screen with Glitchy Text**
+  - [x] Retro Windows 98 / BIOS boot opening screen (`components/OpeningScreen.tsx`) with glitchy text.
+  - [x] Prominently displays "friend98" and *"we have been through this 98 times....."*.
+  - [x] Rebranded project titles, metadata, and chat windows to `friend98`.
+  - [x] Clean transition into hardware setup wizard upon clicking `[ Begin Session 98 ]`.
+
+- [x] **12. "there is no escape" 3-Click Window Close Climax**
+  - [x] Tracked window close attempts (`[X]`) on main chat window.
+  - [x] Attempt 1: Refusal warning dialog ("A friend does not leave so easily").
+  - [x] Attempt 2: Corrupted warning dialog ("Why are you trying to leave? We have been through this 98 times.....").
+  - [x] Attempt 3: Screen shake, audio glitch sting, and high-impact corrupted banner displaying **"THERE IS NO ESCAPE"**.
+  - [x] Automatically triggers ending climax 1.6s later (*"I can still hear you."*).
+
+- [x] **13. Final Build Verification & Push**
   - [x] Production build verified (`npm run build` succeeds cleanly with 0 errors).
+  - [x] Changes committed and pushed to `origin main`.

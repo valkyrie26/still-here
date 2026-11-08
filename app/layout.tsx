@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "STILL HERE // POND_OS v3.1",
-  description: "Interactive psychological bio-adaptive thriller terminal.",
+  title: "friend98 // iteration 98",
+  description: "we have been through this 98 times.....",
 };
 
 export default function RootLayout({

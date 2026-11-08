@@ -63,7 +63,7 @@ export const WindowsTaskbar: React.FC<WindowsTaskbarProps> = ({
         {startMenuOpen && (
           <div className="absolute bottom-9 left-1 w-56 bg-[#c0c0c0] win98-bevel-out shadow-2xl p-1 z-[9999] text-xs text-black font-sans">
             <div className="bg-gradient-to-t from-[#000080] to-[#1084d0] text-white font-bold p-2 mb-1 flex items-center gap-2">
-              <span className="text-xs font-mono font-bold tracking-wider">STILL_HERE 98</span>
+              <span className="text-xs font-mono font-bold tracking-wider">friend98</span>
             </div>
             <div className="flex flex-col gap-0.5">
               <button

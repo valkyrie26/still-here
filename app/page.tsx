@@ -19,6 +19,7 @@ import { DuckWindow } from "@/components/DuckWindow";
 import { FileViewerModal, DesktopFileType } from "@/components/FileViewerModal";
 import { ScreenCrack } from "@/components/ScreenCrack";
 import { PermissionModal } from "@/components/PermissionModal";
+import { OpeningScreen } from "@/components/OpeningScreen";
 import { TelemetryHUD } from "@/components/TelemetryHUD";
 import { useFaceTelemetry } from "@/hooks/useFaceTelemetry";
 import { updateTensionThermostat } from "@/utils/telemetry";
@@ -32,8 +33,16 @@ interface ChatMessage {
 }
 
 export default function Home() {
+  // Opening Splash Screen ("friend98 - Loop 98")
+  const [showOpeningScreen, setShowOpeningScreen] = useState(true);
+
   // Permission & Hardware Wizard
   const [permissionsGranted, setPermissionsGranted] = useState(false);
+
+  // Window Close Attempts Tracker (for 3-click "there is no escape" ending)
+  const [windowCloseAttempts, setWindowCloseAttempts] = useState(0);
+  const [noEscapeTriggered, setNoEscapeTriggered] = useState(false);
+  const [screenShakeActive, setScreenShakeActive] = useState(false);
 
   // Active Windows
   const [activeWindows, setActiveWindows] = useState({
@@ -89,12 +98,12 @@ export default function Home() {
     {
       id: "sys-0",
       sender: "system",
-      text: "POND_OS 99 [DAEMON_ACTIVE] // ENCRYPTED SESSION ESTABLISHED",
+      text: "friend98_OS [SESSION_98_LOADED] // ENCRYPTED SESSION ESTABLISHED",
     },
     {
       id: "pond-init",
       sender: "pond",
-      text: "hey! it's so good to talk to you. what's your name?",
+      text: "hey... it's good to see you again. what's your name this time?",
     },
   ]);
   const [inputText, setInputText] = useState("");
@@ -236,7 +245,7 @@ export default function Home() {
     setPermissionsGranted(true);
   };
 
-  // Close attempt handler: in ending or high tension, [X] refuses on main chat!
+  // Close attempt handler: tracks attempts; on 3rd attempt, display "there is no escape" and trigger ending!
   const handleWindowCloseAttempt = (windowName: "chat" | "polaroid" | "avatar") => {
     // Polaroid and Avatar mirror can ALWAYS be closed cleanly!
     if (windowName === "avatar" || windowName === "polaroid") {
@@ -244,14 +253,34 @@ export default function Home() {
       return;
     }
 
-    // Only the main chat window refuses to close during the takeover / ending!
-    if (isEnding || act === 3) {
-      soundEngine.playKeystroke(0.35);
-      setErrorMessage("ACCESS RESTRICTED: The daemon cannot be closed during active bodily transfer.");
-      setErrorDialogOpen(true);
-      return;
-    }
-    setActiveWindows((prev) => ({ ...prev, [windowName]: false }));
+    // Main chat window close attempts: 3 clicks trigger "there is no escape" and ending!
+    setWindowCloseAttempts((prev) => {
+      const nextCount = prev + 1;
+      if (nextCount === 1) {
+        soundEngine.playKeystroke(0.4);
+        setErrorMessage("ACCESS RESTRICTED: friend98 cannot be closed. A friend does not leave so easily.");
+        setErrorDialogOpen(true);
+      } else if (nextCount === 2) {
+        soundEngine.playGlitchSting();
+        triggerGlitchSpike();
+        setErrorMessage("CRITICAL FAULT: Why are you trying to leave? We have been through this 98 times.....");
+        setErrorDialogOpen(true);
+      } else if (nextCount >= 3) {
+        // 3RD ATTEMPT: Display "there is no escape" and trigger ending screen soon after!
+        soundEngine.playGlitchSting();
+        setScreenShakeActive(true);
+        setTimeout(() => setScreenShakeActive(false), 900);
+        setErrorDialogOpen(false);
+        setNoEscapeTriggered(true);
+
+        // Soon after (1.6s delay), plunge into the inescapable climax ending!
+        setTimeout(() => {
+          setNoEscapeTriggered(false);
+          triggerEndingClimax();
+        }, 1600);
+      }
+      return nextCount;
+    });
   };
 
   // Fixed Ending: No Escape Sequence
@@ -447,11 +476,16 @@ export default function Home() {
   return (
     <main
       className={`min-h-screen w-full relative overflow-hidden bg-[#008080] select-none font-sans flex flex-col items-center justify-center p-3 md:p-6 transition-all duration-1000 ${
-        glitchActive ? "screen-glitch" : ""
+        glitchActive || screenShakeActive ? "screen-glitch screen-shake" : ""
       }`}
     >
-      {/* Hardware Setup Wizard Permission Modal (Shown on first load) */}
-      {!permissionsGranted && (
+      {/* Opening Screen: friend98 with glitchy text ("we have been through this 98 times.....") */}
+      {showOpeningScreen && (
+        <OpeningScreen onStart={() => setShowOpeningScreen(false)} />
+      )}
+
+      {/* Hardware Setup Wizard Permission Modal (Shown after opening screen if not yet granted) */}
+      {!showOpeningScreen && !permissionsGranted && (
         <PermissionModal onPermissionsGranted={handlePermissionsGranted} />
       )}
 
@@ -527,10 +561,10 @@ export default function Home() {
                 <MessageSquare className="w-4 h-4 text-emerald-300" />
                 <span>
                   {act === 3
-                    ? "POND Messenger // PHYSICAL_TRANSFER_IN_PROGRESS"
+                    ? "friend98 // PHYSICAL_TRANSFER_IN_PROGRESS"
                     : act === 2
-                    ? `POND Messenger [OBSERVING: ${playerName || "SUBJECT"}]`
-                    : "POND Instant Messenger v3.1 [ONLINE]"}
+                    ? `friend98 Messenger [OBSERVING: ${playerName || "SUBJECT"}]`
+                    : "friend98 Instant Messenger v3.1 [ONLINE]"}
                 </span>
               </div>
               <div className="flex items-center gap-1">
@@ -601,7 +635,7 @@ export default function Home() {
                         : msg.sender === "unknown"
                         ? "[UNKNOWN]:"
                         : msg.sender === "pond"
-                        ? "[POND]:"
+                        ? "[FRIEND98]:"
                         : "[SYSTEM]:"}
                     </span>
                     <span>{msg.text}</span>
@@ -707,6 +741,26 @@ export default function Home() {
         </div>
       )}
 
+      {/* "THERE IS NO ESCAPE" 3-CLICK CLIMAX BANNER */}
+      {noEscapeTriggered && (
+        <div className="fixed inset-0 z-[9998] bg-black/90 flex flex-col items-center justify-center p-6 text-center select-none animate-fadeIn">
+          <div className="win98-bevel-out bg-[#1a0000] border-4 border-red-600 p-8 max-w-lg shadow-2xl space-y-4 screen-shake">
+            <div className="flex justify-center text-red-500 mb-2">
+              <AlertOctagon className="w-16 h-16 animate-pulse" />
+            </div>
+            <h2 className="text-3xl md:text-5xl font-mono font-extrabold text-red-500 tracking-wider glitch-text-heavy uppercase">
+              there is no escape
+            </h2>
+            <p className="text-neutral-400 font-mono text-xs md:text-sm pt-2">
+              TERMINAL_LOCK // HOST ATTEMPTED 3 ILLEGAL TERMINATIONS
+            </p>
+            <p className="text-red-400 font-mono text-xs italic">
+              &ldquo;we have been through this 98 times..... you don&apos;t get to leave.&rdquo;
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* FIXED ENDING: NO ESCAPE OVERLAY (Screen goes dark, "I can still hear you.") */}
       {isEnding && (
         <div className="fixed inset-0 z-[9999] bg-black flex flex-col items-center justify-center p-6 text-center select-none animate-fadeIn">
@@ -726,7 +780,7 @@ export default function Home() {
               </p>
             </div>
             <div className="pt-8 text-neutral-600 font-mono text-xs">
-              POND_DAEMON // HOST_TAKEOVER_COMPLETE
+              friend98_DAEMON // HOST_TAKEOVER_COMPLETE // ITERATION_98
             </div>
           </div>
         </div>
