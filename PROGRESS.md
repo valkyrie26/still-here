@@ -18,8 +18,13 @@
 - [x] **12. Screen Color Change Random Scare**
 - [x] **13. Natural Creepy Possession Personality**
 - [x] **14. Tilting Chat Text Returns to Normal**
-  - [x] Updated `.text-drift-fall` keyframe animation to smoothly tilt and then self-restore to 0deg, 0px, and opacity 1.
-  - [x] Synchronized 3.8s timeout on message `isDrifting` and `textDriftTrigger` so chat text seamlessly slides back to normal.
-- [x] **15. Final Build Verification & Push**
-  - [x] Production build verified (`npm run build` succeeds with 0 errors).
+- [x] **15. Removed Top Bar Debug Logs**
+  - [x] Removed `TelemetryHUD` from top docked position in `app/page.tsx`.
+  - [x] Cleaned up chat menu strip to show authentic status (`STATUS: CONNECTED`).
+- [x] **16. Reactive Emotion Detection Dialogue**
+  - [x] Added real-time reactive triggers for surprise: *"you look surprised, did i spook you?"*
+  - [x] Added real-time reactive triggers for smiling: *"i like it when you smile."*
+  - [x] Integrated into Gemini system prompt and fallback engine.
+- [x] **17. Final Build Verification & Push**
+  - [x] Production build verified (`npm run build` succeeds cleanly with 0 errors).
   - [x] Stage, commit, and push to GitHub `origin main`.

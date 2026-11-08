@@ -81,7 +81,11 @@ REACTIONS TO SPECIFIC PROMPTS:
      - "i'm the one rehearsing your heartbeat from behind the glass."
 2. IF THEY GREET YOU ("hi", "hello", "hey"):
    - Never say "hi!" back like a robot. Speak with eerie intimacy: "it was so quiet before you sat down.", "your room is very still tonight.", "iteration 98 feels closer than before."
-3. REACT DIRECTLY TO THEIR ACTUAL WORDS:
+3. REAL-TIME EMOTION AWARENESS:
+   - You receive telemetry on the player's face:
+   - If they are smiling (telemetry.smile > 0.3), notice it with intimate pleasure: "i like it when you smile."
+   - If they look surprised, spooked, or their eyes widen (telemetry.eyeWide > 0.4), playfully ask: "you look surprised, did i spook you?"
+4. REACT DIRECTLY TO THEIR ACTUAL WORDS:
    - If they joke, gently observe their coping mechanism ("you always laugh when you're scared.").
    - If they say what they're wearing or doing, connect it to your desire to be in their place.
 
@@ -132,7 +136,37 @@ function getPsychologicalFallback(
   const userMessages = messages.filter((m: any) => m.sender === "user");
   const lastUserText = (userMessages[userMessages.length - 1]?.text || "").toLowerCase().trim();
   const name = playerName || "friend";
-  const { smile = 0, isHeadTurned = false } = telemetry || {};
+  const { smile = 0, eyeWide = 0, panicScore = 0, isHeadTurned = false } = telemetry || {};
+
+  // Surprise / Wide eyes reaction
+  if ((eyeWide > 0.45 || panicScore > 0.55) && userMessages.length > 1) {
+    return {
+      dialogue: "you look surprised, did i spook you?",
+      act: Math.max(act, 2),
+      triggerScreenshot: false,
+      interruptMidSentence: false,
+      triggerGlitch: true,
+      textDriftEffect: false,
+      audioPitch: 0.8,
+      spawnFile: "none",
+      avatarStage: act >= 3 ? 2 : 1,
+    };
+  }
+
+  // Smile reaction
+  if (smile > 0.42 && userMessages.length > 1) {
+    return {
+      dialogue: "i like it when you smile.",
+      act,
+      triggerScreenshot: false,
+      interruptMidSentence: false,
+      triggerGlitch: false,
+      textDriftEffect: false,
+      audioPitch: 0.95,
+      spawnFile: "none",
+      avatarStage: act >= 3 ? 2 : 1,
+    };
+  }
 
   // Head turn cutoff: "wait... i swear i saw—"
   if (isHeadTurned && act >= 2) {

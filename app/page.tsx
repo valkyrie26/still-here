@@ -20,7 +20,6 @@ import { FileViewerModal, DesktopFileType } from "@/components/FileViewerModal";
 import { ScreenCrack } from "@/components/ScreenCrack";
 import { PermissionModal } from "@/components/PermissionModal";
 import { OpeningScreen } from "@/components/OpeningScreen";
-import { TelemetryHUD } from "@/components/TelemetryHUD";
 import { useFaceTelemetry } from "@/hooks/useFaceTelemetry";
 import { updateTensionThermostat } from "@/utils/telemetry";
 import { soundEngine } from "@/utils/sound";
@@ -118,6 +117,8 @@ export default function Home() {
   const typingAudioPitch = useRef<number>(1.0);
   const faceMissingStartTimeRef = useRef<number | null>(null);
   const lastFaceMissingTriggerRef = useRef<number>(0);
+  const lastSmileReactionTimeRef = useRef<number>(0);
+  const lastSurpriseReactionTimeRef = useRef<number>(0);
 
   // Typewriter audio playback
   const playTypewriterForText = useCallback((text: string) => {
@@ -292,6 +293,58 @@ export default function Home() {
       faceMissingStartTimeRef.current = null;
     }
   }, [telemetry.hasDetectedFace, permissionsGranted, isEnding, showOpeningScreen, playTypewriterForText]);
+
+  // Real-Time Facial Emotion Detection ("you look surprised, did i spook you", "i like it when you smile")
+  useEffect(() => {
+    if (!permissionsGranted || isEnding || showOpeningScreen) return;
+
+    const now = Date.now();
+
+    // 1. Surprise Detection (wide eyes > 0.42 or high sudden panic)
+    if (
+      (telemetry.eyeWide > 0.42 || telemetry.panicScore > 0.52) &&
+      now - lastSurpriseReactionTimeRef.current > 26000
+    ) {
+      lastSurpriseReactionTimeRef.current = now;
+      const surpriseText = "you look surprised, did i spook you?";
+      soundEngine.playKeystroke(0.5);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `pond-surprise-${Date.now()}`,
+          sender: "pond",
+          text: surpriseText,
+        },
+      ]);
+      playTypewriterForText(surpriseText);
+      return;
+    }
+
+    // 2. Smile Detection (smile > 0.38)
+    if (telemetry.smile > 0.38 && now - lastSmileReactionTimeRef.current > 26000) {
+      lastSmileReactionTimeRef.current = now;
+      const smileText = "i like it when you smile.";
+      soundEngine.playKeystroke(0.65);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `pond-smile-${Date.now()}`,
+          sender: "pond",
+          text: smileText,
+        },
+      ]);
+      playTypewriterForText(smileText);
+      return;
+    }
+  }, [
+    telemetry.eyeWide,
+    telemetry.smile,
+    telemetry.panicScore,
+    permissionsGranted,
+    isEnding,
+    showOpeningScreen,
+    playTypewriterForText,
+  ]);
 
   // Handle Hardware Permissions Granted from Modal
   const handlePermissionsGranted = (stream: MediaStream | null) => {
@@ -604,15 +657,6 @@ export default function Home() {
         spawnedFiles={spawnedFiles}
       />
 
-      {/* TOP DOCKED: Biometric Affect & Tension Telemetry HUD */}
-      <div className="absolute top-1 left-28 right-4 md:left-36 md:right-8 z-20">
-        <TelemetryHUD
-          telemetry={{ ...telemetry, tension }}
-          isModelReady={isModelReady}
-          clownStage={storyStage >= 3 ? "near_unsmiling" : "none"}
-        />
-      </div>
-
       {/* HIDDEN WEBCAM VIDEO (silent background processing for MediaPipe) */}
       <video
         ref={(el) => {
@@ -691,10 +735,7 @@ export default function Home() {
                 </span>
               </div>
               <div className="text-[11px] font-mono text-neutral-600">
-                ACT: <strong className="text-emerald-800">{act}</strong> | TENSION:{" "}
-                <strong className={tension > 60 ? "text-red-700" : "text-emerald-800"}>
-                  {tension}%
-                </strong>
+                STATUS: <strong className="text-emerald-800">CONNECTED</strong>
               </div>
             </div>
 
