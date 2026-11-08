@@ -1,59 +1,36 @@
-# Implementation Plan: Random Screen Color Scare & Natural Creepy Possession Personality
+# Implementation Plan: Restoring Tilting Chat Text to Normal
 
 ## Overview & Scope
-This plan implements two core updates requested by the user:
-1. **Random Screen Color Scare**:
-   - A sudden, shocking screen color alteration (blood crimson wash, photographic negative inversion, or decaying corrupted amber CRT shift) that triggers as a random psychological jump-scare during gameplay.
-   - Triggered randomly during high tension, on creepy dialogue glitches, and via demo shortcut key `[7]`.
-2. **Gemini Natural Creepy Possession Persona**:
-   - Refine the AI system instructions in `app/api/pond/route.ts` with explicit instructions:
-     - The AI is an entity who wants to **possess the player**, take over their physical body, wear their skin, and live their life in the real world.
-     - She must sound completely **natural, intimate, and authentic** (never scripted, canned, or robotic).
-     - When the player asks *"who are you"*, *"who areyou"*, or *"what are you"*, she delivers chilling, natural replies revealing her desire to inhabit their body (e.g. *"i'm the girl who wants to live inside you. we've practiced this 98 times."*).
-     - Update the offline psychological fallback engine to deliver the same eerie, natural possession answers.
+When chat messages tilt or drift as an eerie atmospheric anomaly, the user requested that they return completely to normal after a few seconds instead of staying permanently crooked or displaced.
 
 ---
 
 ## Files Touched & Specific Modifications
 
 ### 1. `app/globals.css`
-- Add screen color scare CSS classes:
-  - `.screen-color-blood`: Abrupt crimson blood wash with saturated red shadows and contrast.
-  - `.screen-color-invert`: Sudden photographic negative color inversion with cyan/amber inversion.
-  - `.screen-color-corrupt`: Decaying high-contrast amber/monochrome radiation shift.
-  - Add `.screen-color-flicker` animation for sudden onset and unstable electrical recovery.
+- Update `.text-drift-fall`:
+  - Change the keyframe animation (`letterDrop` or `textTiltWave`) into a seamless round-trip animation:
+    - 0%: Normal baseline (`rotate(0deg)`, `translateY(0)`, `opacity: 1`).
+    - 30%: Subtle unsettling tilt (`rotate(2deg)`, `translateY(4px)`).
+    - 55%: Peak uncanny sag & distortion (`rotate(4.5deg)`, `translateY(9px)`, `opacity: 0.8`).
+    - 80%: Straightening back up (`rotate(1.5deg)`, `translateY(2px)`, `opacity: 0.95`).
+    - 100%: Completely restored to normal (`rotate(0deg)`, `translateY(0)`, `opacity: 1`).
+  - Duration: 3.5s with smooth `ease-in-out` timing.
 
 ### 2. `app/page.tsx`
-- Add state: `screenColorScare: "none" | "blood" | "invert" | "corrupt"`.
-- Implement `triggerScreenColorScare(forcedMode?)`:
-  - Chooses among blood crimson, negative inversion, or corrupt amber.
-  - Plays audio sting / bass drop.
-  - Persists for ~1.6–2.2 seconds before snapping back to normal.
-- Integrate into:
-  - The 1.5s thermostat loop (random scare chance when tension > 30, with cooldown).
-  - Backend AI responses with `triggerGlitch: true`.
-  - Demo key shortcut `[7]` and update the demo shortcuts HUD.
-- Apply the active class to the desktop `<main>` container.
+- Ensure message `isDrifting` flags automatically reset to `false` after 3.5 seconds so messages never stay permanently tilted.
+- Keep `textDriftTrigger` duration synchronized to ~3.5 seconds.
 
-### 3. `app/api/pond/route.ts`
-- **System Prompt Refinement**:
-  - Explicitly direct the model: She is an entity who wants to **possess the player** and take over their physical body.
-  - Emphasize conversational spontaneity and natural cadence.
-  - Dictate exact creepy, intimate responses to questions like *"who are you"*, *"who areyou"*, *"what are you"*, *"what is this"*.
-- **Fallback Engine (`getPsychologicalFallback`)**:
-  - Update matching for *"who are you"*, *"who areyou"*, *"who are u"*, *"what are you"* to return chilling, natural possession dialogue.
-
-### 4. `PROGRESS.md`
-- Keep updated with all tasks and verification steps.
+### 3. `PROGRESS.md`
+- Track progress and verification.
 
 ---
 
 ## Step-by-Step Execution Sequence
-1. Write `PLAN.md` (this file).
-2. Update `PROGRESS.md` with new items.
-3. Add screen color scare CSS classes to `app/globals.css`.
-4. Update `app/api/pond/route.ts` with natural creepy possession system instructions and fallback responses.
-5. Update `app/page.tsx` with screen color scare state, randomized scare triggers, and demo key `[7]`.
-6. Run `npm run build` to verify zero errors.
-7. Stage, commit, and push to GitHub `main`.
-8. Provide exact instructions on how to test each feature.
+1. Update `PLAN.md` (this file).
+2. Update `PROGRESS.md`.
+3. Update keyframe animation in `app/globals.css`.
+4. Update message drift cleanup in `app/page.tsx`.
+5. Run `npm run build` to verify zero errors.
+6. Commit and push to GitHub `main`.
+7. Provide instructions for testing.

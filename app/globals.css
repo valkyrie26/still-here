@@ -139,17 +139,33 @@ body {
   }
 }
 
-/* Text Drift / Corrupted falling text */
+/* Text Drift / Temporary uncanny tilting text that returns to normal */
 .text-drift-fall {
   display: inline-block;
-  animation: letterDrop 3.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation: textTiltReturn 3.8s cubic-bezier(0.37, 0, 0.63, 1) forwards;
 }
 
-@keyframes letterDrop {
-  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-  30% { transform: translateY(2px) rotate(1.5deg); }
-  60% { transform: translateY(12px) rotate(4deg); opacity: 0.8; }
-  100% { transform: translateY(45px) rotate(12deg); opacity: 0.2; }
+@keyframes textTiltReturn {
+  0% {
+    transform: translateY(0) rotate(0deg) skewX(0deg);
+    opacity: 1;
+  }
+  25% {
+    transform: translateY(3px) rotate(2.5deg) skewX(-1.5deg);
+    opacity: 0.9;
+  }
+  50% {
+    transform: translateY(7px) rotate(4.5deg) skewX(-3deg);
+    opacity: 0.8;
+  }
+  75% {
+    transform: translateY(3px) rotate(2deg) skewX(-1deg);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(0) rotate(0deg) skewX(0deg);
+    opacity: 1;
+  }
 }
 
 /* Pixel font / Sans serif fallback */

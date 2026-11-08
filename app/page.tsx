@@ -242,7 +242,7 @@ export default function Home() {
               triggerScreenColorScare();
             } else if (Math.random() < 0.25) {
               setTextDriftTrigger(true);
-              setTimeout(() => setTextDriftTrigger(false), 3000);
+              setTimeout(() => setTextDriftTrigger(false), 3800);
             }
           }
         }
@@ -491,6 +491,7 @@ export default function Home() {
         }
         if (data.textDriftEffect) {
           setTextDriftTrigger(true);
+          setTimeout(() => setTextDriftTrigger(false), 3800);
         }
         if (data.triggerScreenshot) {
           setTimeout(() => {
@@ -515,15 +516,25 @@ export default function Home() {
           }, 6000);
         }
 
+        const newMsgId = `pond-${Date.now()}`;
         setMessages((prev) => [
           ...prev,
           {
-            id: `pond-${Date.now()}`,
+            id: newMsgId,
             sender: "pond",
             text: data.dialogue,
             isDrifting: data.textDriftEffect,
           },
         ]);
+
+        // Bring tilting text back to normal after a few seconds
+        if (data.textDriftEffect) {
+          setTimeout(() => {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === newMsgId ? { ...m, isDrifting: false } : m))
+            );
+          }, 3800);
+        }
 
         playTypewriterForText(data.dialogue);
       }
