@@ -142,6 +142,7 @@ export function useFaceTelemetry({
                 sessionElapsed,
                 currentTensionRef.current
               );
+              currentTelemetry.hasDetectedFace = true;
 
               setTelemetry(currentTelemetry);
 
@@ -169,6 +170,7 @@ export function useFaceTelemetry({
             } else {
               setTelemetry((prev) => ({
                 ...prev,
+                hasDetectedFace: false,
                 timeInSession: sessionElapsed,
                 tension: currentTensionRef.current,
               }));

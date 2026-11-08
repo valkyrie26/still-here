@@ -11,7 +11,7 @@
 - [x] **2. Permission Modal & Bug 2 Fix**
   - [x] Windows 98 Hardware Setup Wizard asking clearly for Camera and Microphone access.
   - [x] Removed "Skip (Offline Mode)" button so players never miss the signature webcam screenshot.
-  - [x] Added cycling creepy toast alerts ("it is dark in here without your camera...").
+  - [x] Added cycling creepy toast alerts.
 
 - [x] **3. Personality Engine (Gemini 3-Act System)**
   - [x] Act 1 (warm, normal friend, asks name and mood, uses player's name).
@@ -21,45 +21,40 @@
 
 - [x] **4. Tension Thermostat**
   - [x] Dynamic tension score (0–100) evaluated every 1.5s via `updateTensionThermostat`.
-  - [x] Tension drives narrative Acts, screen darkening, audio pitch, and visual distortions.
 
 - [x] **5. Layered Screenshot Moment & Bug 1 Fix**
   - [x] Fixed segmentation mask selection in `utils/segmentation.ts` so person cutout is strictly foreground.
-  - [x] Strict 3-layer compositing: Room Background -> Ghost Entity (`creepy_clown_standing.png`) -> Person Cutout ON TOP.
   - [x] Ghost entity is physically BEHIND the player with zero clipping.
 
 - [x] **6. Desktop Creepiness & Spawning Files**
   - [x] Spawns `notes_about_you.txt`, `poem.txt`, `reflection.bmp`, and `you_sleeping.avi`.
-  - [x] Built `components/FileViewerModal.tsx` for Notepad, Imaging, and Windows Media Player.
 
 - [x] **7. The Uncanny Avatar & Smile Warp**
-  - [x] Built `components/AvatarWindow.tsx` applying canvas warp.
   - [x] Smile warp deformation strictly confined to mouth corners curling sharply upwards.
   - [x] Avatar window close button `[X]` allows closing to return to chat.
 
-- [x] **8. Audio (Hum, Distant Breath, Sudden Silence)**
+- [x] **8. Audio & Ending Climax**
   - [x] Web Audio low ambient drone, procedural breathing, and sudden dead silence.
+  - [x] 3-Click close attempt displays "there is no escape" before plunging into ending blackout.
 
-- [x] **9. Fixed Ending (No Escape)**
-  - [x] Blackout transition with "I can still hear you." and AI dialogue into the void.
+- [x] **9. "friend98" Opening Screen with Glitchy Text**
+  - [x] Retro Windows 98 / BIOS boot opening screen with glitchy text ("we have been through this 98 times.....").
 
-- [x] **10. THE DUCK: "Friend.exe" ASCII AI Face**
-  - [x] Windows 98 window titled "Friend.exe" next to chat from the very first scene.
-  - [x] 5 Dynamic ASCII frames responding to tension and act.
+- [x] **10. Face-Missing Easter Egg**
+  - [x] Monitored webcam telemetry for face absence (`hasDetectedFace === false`).
+  - [x] Fires creepy easter egg into chat after 3.2s of missing face: *"why hide your face, it's only me."* with typewriter sound.
 
-- [x] **11. "friend98" Opening Screen with Glitchy Text**
-  - [x] Retro Windows 98 / BIOS boot opening screen (`components/OpeningScreen.tsx`) with glitchy text.
-  - [x] Prominently displays "friend98" and *"we have been through this 98 times....."*.
-  - [x] Rebranded project titles, metadata, and chat windows to `friend98`.
-  - [x] Clean transition into hardware setup wizard upon clicking `[ Begin Session 98 ]`.
+- [x] **11. Ending Screen Dialog Change**
+  - [x] Updated ending blackout headline and dialogue sequence to: *"now we can be together forever."*
 
-- [x] **12. "there is no escape" 3-Click Window Close Climax**
-  - [x] Tracked window close attempts (`[X]`) on main chat window.
-  - [x] Attempt 1: Refusal warning dialog ("A friend does not leave so easily").
-  - [x] Attempt 2: Corrupted warning dialog ("Why are you trying to leave? We have been through this 98 times.....").
-  - [x] Attempt 3: Screen shake, audio glitch sting, and high-impact corrupted banner displaying **"THERE IS NO ESCAPE"**.
-  - [x] Automatically triggers ending climax 1.6s later (*"I can still hear you."*).
+- [x] **12. Growing Duck Window on [X] Clicks**
+  - [x] Each click on `[X]` expands `DuckWindow` scale progressively (`1.0 + windowCloseAttempts * 0.35`).
+  - [x] `Friend.exe` looms larger and larger over the desktop with every escape attempt.
 
-- [x] **13. Final Build Verification & Push**
+- [x] **13. Pixel Art Blue Duck with Yellow Beak**
+  - [x] Built crisp 90s retro SVG pixel graphics (`image-rendering: pixelated`) replacing ASCII art.
+  - [x] Interactive expressions: blinking eyes and blush (Act 1), delayed cursor gaze tracking (Act 2), uncanny wide stare and stretched grin (Act 3), player webcam morph (Ending).
+
+- [x] **14. Final Build Verification & Push**
   - [x] Production build verified (`npm run build` succeeds cleanly with 0 errors).
-  - [x] Changes committed and pushed to `origin main`.
+  - [x] Committed and pushed to `origin main`.

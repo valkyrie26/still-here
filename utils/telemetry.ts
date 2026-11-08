@@ -20,6 +20,7 @@ export interface FaceTelemetry {
   heartRateStress: number; // 0 to 100 physiological stress index
   panicScore: number; // 0.0 to 1.0 combined fear index
   faceBox: FaceBox; // spatial surroundings data
+  hasDetectedFace?: boolean; // true if a face is currently detected in camera frame
   timeInSession: number; // seconds
   tension: number; // 0 to 100 dynamic tension score
 }

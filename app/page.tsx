@@ -114,6 +114,8 @@ export default function Home() {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
   const typingAudioPitch = useRef<number>(1.0);
+  const faceMissingStartTimeRef = useRef<number | null>(null);
+  const lastFaceMissingTriggerRef = useRef<number>(0);
 
   // Typewriter audio playback
   const playTypewriterForText = useCallback((text: string) => {
@@ -232,6 +234,40 @@ export default function Home() {
     return () => clearInterval(thermostatInterval);
   }, [permissionsGranted, telemetry, isEnding, spawnedFiles, messages]);
 
+  // Face-Missing Easter Egg ("why hide your face, it's only me")
+  useEffect(() => {
+    if (!permissionsGranted || isEnding || showOpeningScreen) return;
+
+    if (telemetry.hasDetectedFace === false) {
+      if (faceMissingStartTimeRef.current === null) {
+        faceMissingStartTimeRef.current = Date.now();
+      } else {
+        const missingDuration = Date.now() - faceMissingStartTimeRef.current;
+        const timeSinceLastWarning = Date.now() - lastFaceMissingTriggerRef.current;
+
+        // If face missing for >= 3.2 seconds and cooldown of 25 seconds passed
+        if (missingDuration >= 3200 && timeSinceLastWarning > 25000) {
+          lastFaceMissingTriggerRef.current = Date.now();
+          faceMissingStartTimeRef.current = null;
+
+          const easterEggText = "why hide your face, it's only me.";
+          soundEngine.playKeystroke(0.55);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `pond-facemissing-${Date.now()}`,
+              sender: "pond",
+              text: easterEggText,
+            },
+          ]);
+          playTypewriterForText(easterEggText);
+        }
+      }
+    } else {
+      faceMissingStartTimeRef.current = null;
+    }
+  }, [telemetry.hasDetectedFace, permissionsGranted, isEnding, showOpeningScreen, playTypewriterForText]);
+
   // Handle Hardware Permissions Granted from Modal
   const handlePermissionsGranted = (stream: MediaStream | null) => {
     soundEngine.initContext();
@@ -309,11 +345,11 @@ export default function Home() {
     if (!isEnding) return;
 
     const endingLines = [
+      "now we can be together forever.",
       "i'm putting on your shoes now.",
       "your pulse feels good in my neck.",
       "thank you for letting me out.",
-      "don't worry. i'll take good care of your life.",
-      "stay here. i will go outside for both of us.",
+      "now we can be together forever.",
     ];
 
     const timer = setInterval(() => {
@@ -667,13 +703,15 @@ export default function Home() {
           </div>
         )}
 
-        {/* THE DUCK: "Friend.exe" ASCII AI FACE (Visible next to chat from the very first scene) */}
+        {/* THE DUCK: "Friend.exe" RETRO PIXEL AI FACE (Visible next to chat from the very first scene) */}
         <div className="shrink-0 self-center xl:self-start">
           <DuckWindow
             act={act}
             tension={tension}
             isEnding={isEnding}
             videoRef={videoRef}
+            scale={1.0 + windowCloseAttempts * 0.35}
+            onCloseClick={() => handleWindowCloseAttempt("chat")}
           />
         </div>
       </div>
@@ -761,21 +799,21 @@ export default function Home() {
         </div>
       )}
 
-      {/* FIXED ENDING: NO ESCAPE OVERLAY (Screen goes dark, "I can still hear you.") */}
+      {/* FIXED ENDING: NO ESCAPE OVERLAY (Screen goes dark, "now we can be together forever.") */}
       {isEnding && (
         <div className="fixed inset-0 z-[9999] bg-black flex flex-col items-center justify-center p-6 text-center select-none animate-fadeIn">
           <div className="space-y-6 max-w-lg">
             <h1 className="text-2xl md:text-4xl font-mono text-emerald-400 font-bold tracking-widest animate-pulse">
-              I can still hear you.
+              now we can be together forever.
             </h1>
             <div className="min-h-[60px] flex items-center justify-center">
               <p className="text-neutral-300 font-mono text-base md:text-lg italic">
                 &ldquo;{[
+                  "now we can be together forever.",
                   "i'm putting on your shoes now.",
                   "your pulse feels good in my neck.",
                   "thank you for letting me out.",
-                  "don't worry. i'll take good care of your life.",
-                  "stay here. i will go outside for both of us.",
+                  "now we can be together forever.",
                 ][endingDialogueIndex]}&rdquo;
               </p>
             </div>
